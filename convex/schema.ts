@@ -252,4 +252,25 @@ export default defineSchema({
     })
         .index("by_idea", ["ideaId"])
         .index("by_idea_user", ["ideaId", "userId"]),
+
+    settlements: defineTable({
+        tripId: v.id("trips"),
+        fromUserId: v.id("users"),
+        toUserId: v.id("users"),
+        amount: v.number(),
+        currency: v.string(),
+        method: v.optional(v.union(
+            v.literal("venmo"),
+            v.literal("paypal"),
+            v.literal("cash"),
+            v.literal("bank"),
+            v.literal("other")
+        )),
+        settledBy: v.id("users"),
+        settledAt: v.number(),
+        note: v.optional(v.string()),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_from_user", ["tripId", "fromUserId"])
+        .index("by_to_user", ["tripId", "toUserId"]),
 });

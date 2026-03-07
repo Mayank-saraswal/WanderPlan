@@ -9,6 +9,7 @@
  */
 
 import type * as activities from "../activities.js";
+import type * as ai from "../ai.js";
 import type * as checklists from "../checklists.js";
 import type * as comments from "../comments.js";
 import type * as days from "../days.js";
@@ -17,6 +18,7 @@ import type * as files from "../files.js";
 import type * as ideas from "../ideas.js";
 import type * as notifications from "../notifications.js";
 import type * as reservations from "../reservations.js";
+import type * as settlements from "../settlements.js";
 import type * as tripMembers from "../tripMembers.js";
 import type * as trips from "../trips.js";
 import type * as users from "../users.js";
@@ -29,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
+  ai: typeof ai;
   checklists: typeof checklists;
   comments: typeof comments;
   days: typeof days;
@@ -37,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   ideas: typeof ideas;
   notifications: typeof notifications;
   reservations: typeof reservations;
+  settlements: typeof settlements;
   tripMembers: typeof tripMembers;
   trips: typeof trips;
   users: typeof users;

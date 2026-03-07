@@ -1,13 +1,13 @@
 "use client";
 import { useState, use } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { PageLoader, EmptyState } from "@/components/shared/EmptyState";
 import { useTripMember } from "@/hooks/useTripMember";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowRight, Users, Receipt, Scale, Check, Wallet, User, ChevronDown, Sparkles } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Users, Receipt, Scale, Check, Wallet, User, ChevronDown, ExternalLink, CheckCircle, Undo2, Banknote, CreditCard, CircleDollarSign, Sparkles, X, Loader2 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const CAT_COLORS: Record<string, string> = {
@@ -116,6 +116,10 @@ export default function BudgetPage({ params }: Props) {
     const members = useQuery(api.tripMembers.getTripMembers, { tripId });
     const createExpense = useMutation(api.expenses.createExpense);
     const deleteExpense = useMutation(api.expenses.deleteExpense);
+    const existingSettlements = useQuery(api.settlements.getSettlements, { tripId });
+    const markSettled = useMutation(api.settlements.markSettled);
+    const undoSettlement = useMutation(api.settlements.undoSettlement);
+    const explainBudget = useAction(api.ai.explainBudget);
     const notifyMembers = useMutation(api.notifications.notifyTripMembers);
 
     const [showForm, setShowForm] = useState(false);
@@ -125,8 +129,14 @@ export default function BudgetPage({ params }: Props) {
     const [splitMode, setSplitMode] = useState<"all" | "custom">("all");
     const [paidBy, setPaidBy] = useState<string>("");
     const [showPayerDropdown, setShowPayerDropdown] = useState(false);
+    const [settlingIndex, setSettlingIndex] = useState<number | null>(null);
+    const [settleMethod, setSettleMethod] = useState<"venmo" | "paypal" | "cash" | "bank" | "other">("venmo");
 
-    if (!trip || !expenses || !members || !user) return <PageLoader />;
+    // AI Explanation State
+    const [isExplaining, setIsExplaining] = useState(false);
+    const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+
+    if (!trip || !expenses || !members || !user || !existingSettlements) return <PageLoader />;
 
     // Set default payer to current user if not set
     if (!paidBy && user) {
@@ -183,6 +193,41 @@ export default function BudgetPage({ params }: Props) {
             setShowForm(false);
             toast.success("Expense added!");
         } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleExplain = async () => {
+        setIsExplaining(true);
+        setAiExplanation(null);
+        try {
+            // Format settlements with names for the AI
+            const namedSettlements = settlements.map(s => ({
+                from: getMemberName(s.from),
+                to: getMemberName(s.to),
+                amount: s.amount
+            }));
+
+            // Format expenses for the AI
+            const formattedExpenses = expenses.map((e: any) => ({
+                title: e.title,
+                amount: e.amount,
+                paidBy: getMemberName(e.paidBy),
+                splitWith: e.splitWith ? e.splitWith.map(getMemberName) : members.map((m: any) => m.user?.name),
+            }));
+
+            const result = await explainBudget({
+                tripName: trip.title,
+                currency: trip.currency,
+                totalSpent,
+                expenses: formattedExpenses,
+                settlements: namedSettlements
+            });
+            setAiExplanation(result);
+        } catch (error) {
+            toast.error("Failed to generate explanation. Please try again.");
+            setAiExplanation("Unable to generate explanation at this time.");
+        } finally {
+            setIsExplaining(false);
+        }
     };
 
     return (
@@ -448,69 +493,261 @@ export default function BudgetPage({ params }: Props) {
                 </div>
             )}
 
-            {/* ═══ WHO OWES WHO TAB ═══ */}
+            {/* ═══ WHO OWES WHO TAB — SETTLE UP OPTIMIZER ═══ */}
             {activeTab === "balances" && (
                 <div className="px-8 py-6">
                     <div className="bg-[#0A0A0A]/5 border border-[#e5e5e5] px-4 py-3 mb-6 flex items-center gap-2">
                         <Scale className="w-4 h-4 text-[#0A0A0A]/40" />
                         <p className="text-xs text-[#0A0A0A]/50">
-                            All balances are calculated from <strong className="text-[#0A0A0A] font-700">{expenses.length} real expenses</strong> totaling <strong className="text-[#0A0A0A] font-700">{trip.currency} {totalSpent.toFixed(2)}</strong>. No estimates.
+                            <strong className="text-[#EA580C] font-700"> Fair Share Optimizer</strong> — minimized to <strong className="text-[#0A0A0A] font-700">{settlements.length}</strong> payment{settlements.length !== 1 ? "s" : ""} from <strong className="text-[#0A0A0A] font-700">{expenses.length} expenses</strong> totaling <strong className="text-[#0A0A0A] font-700">{trip.currency} {totalSpent.toFixed(2)}</strong>.
                         </p>
                     </div>
 
                     {settlements.length === 0 ? (
                         <div className="text-center py-16">
-                            <Scale className="w-12 h-12 text-[#0A0A0A]/10 mx-auto mb-3" strokeWidth={1} />
-                            <p className="font-display text-lg font-700 uppercase text-[#0A0A0A]/20">All Settled Up!</p>
+                            <CheckCircle className="w-12 h-12 text-emerald-300 mx-auto mb-3" strokeWidth={1} />
+                            <p className="font-display text-lg font-700 uppercase text-emerald-500">All Settled Up!</p>
                             <p className="text-xs text-[#0A0A0A]/30 mt-1">
-                                {expenses.length === 0 ? "Add expenses to start tracking balances" : "Everyone is even — no payments needed"}
+                                {expenses.length === 0 ? "Add expenses to start tracking balances" : "Everyone is even — no payments needed "}
                             </p>
                         </div>
                     ) : (
                         <div>
-                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">
-                                SETTLE UP — {settlements.length} payment{settlements.length > 1 ? "s" : ""} needed
-                            </p>
-                            <div className="space-y-3 mb-8">
-                                {settlements.map((s, i) => (
-                                    <div key={i} className="border border-[#e5e5e5] p-4 flex items-center gap-4">
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                            {getMemberImage(s.from) ? (
-                                                <img src={getMemberImage(s.from)} className="w-8 h-8 rounded-full" alt="" />
-                                            ) : (
-                                                <div className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xs font-700">
-                                                    {getMemberName(s.from).charAt(0)}
-                                                </div>
-                                            )}
-                                            <div>
-                                                <p className="text-sm font-700 text-[#0A0A0A]">{getMemberName(s.from)}</p>
-                                                <p className="text-[10px] uppercase tracking-wider text-red-500 font-700">Owes</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col items-center gap-1 px-3">
-                                            <p className="font-display text-xl font-900 text-[#EA580C]">
-                                                {trip.currency} {s.amount.toFixed(2)}
-                                            </p>
-                                            <ArrowRight className="w-5 h-5 text-[#0A0A0A]/20" />
-                                        </div>
-
-                                        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                                            <div className="text-right">
-                                                <p className="text-sm font-700 text-[#0A0A0A]">{getMemberName(s.to)}</p>
-                                                <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-700">Gets back</p>
-                                            </div>
-                                            {getMemberImage(s.to) ? (
-                                                <img src={getMemberImage(s.to)} className="w-8 h-8 rounded-full" alt="" />
-                                            ) : (
-                                                <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-700">
-                                                    {getMemberName(s.to).charAt(0)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="flex items-center justify-between mb-4">
+                                <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A]">
+                                    SETTLE UP — {settlements.length} payment{settlements.length > 1 ? "s" : ""} needed
+                                </p>
+                                <button
+                                    onClick={handleExplain}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-700 uppercase tracking-wider bg-[#EA580C]/10 text-[#EA580C] hover:bg-[#EA580C]/20 transition-colors border border-[#EA580C]/20"
+                                >
+                                    <Sparkles className="w-3 h-3" />
+                                    Ask AI to Explain
+                                </button>
                             </div>
+                            <div className="space-y-3 mb-8">
+                                {settlements.map((s, i) => {
+                                    // Check if already settled
+                                    const matchingSettlement = existingSettlements.find(
+                                        (es) => es.fromUserId === s.from && es.toUserId === s.to && Math.abs(es.amount - s.amount) < 0.01
+                                    );
+                                    const isSettled = !!matchingSettlement;
+
+                                    // Generate payment deep links
+                                    const payerName = getMemberName(s.from);
+                                    const recipientName = getMemberName(s.to);
+                                    const venmoNote = encodeURIComponent(`WanderPlan trip: ${trip.title} — ${payerName} → ${recipientName}`);
+                                    const venmoUrl = `https://venmo.com/?txn=pay&amount=${s.amount.toFixed(2)}&note=${venmoNote}`;
+                                    const paypalUrl = `https://www.paypal.com/paypalme?amount=${s.amount.toFixed(2)}&currencyCode=${trip.currency}`;
+
+                                    return (
+                                        <div key={i} className={`border p-4 transition-all ${isSettled
+                                            ? "border-emerald-300 bg-emerald-50/50"
+                                            : "border-[#e5e5e5] hover:border-[#EA580C]/30"
+                                            }`}>
+                                            {/* Settlement row */}
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                                {/* Payer */}
+                                                <div className="flex items-center gap-3 flex-1">
+                                                    {getMemberImage(s.from) ? (
+                                                        <img src={getMemberImage(s.from)} className={`w-10 h-10 rounded-full ${isSettled ? "opacity-50" : ""}`} alt="" />
+                                                    ) : (
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-700 ${isSettled ? "bg-emerald-100 text-emerald-400" : "bg-red-100 text-red-600"
+                                                            }`}>
+                                                            {getMemberName(s.from).charAt(0)}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className={`text-base font-700 ${isSettled ? "text-[#0A0A0A]/40 line-through" : "text-[#0A0A0A]"}`}>
+                                                            {getMemberName(s.from)}
+                                                            {s.from === user._id && <span className="text-xs text-[#EA580C] font-800 ml-1">(YOU)</span>}
+                                                        </p>
+                                                        <p className={`text-[10px] uppercase tracking-wider font-700 ${isSettled ? "text-emerald-400" : "text-red-500"
+                                                            }`}>
+                                                            {isSettled ? "Settled ✓" : "Sender"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Action */}
+                                                <div className="flex flex-col items-center px-4">
+                                                    <p className={`text-[10px] uppercase font-800 tracking-widest mb-1.5 ${isSettled ? "text-emerald-400" : "text-[#0A0A0A]/40"}`}>
+                                                        {isSettled ? "PAID" : "MUST PAY"}
+                                                    </p>
+                                                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border ${isSettled ? "bg-emerald-50 border-emerald-200" : "bg-[#EA580C]/10 border-[#EA580C]/20"}`}>
+                                                        <p className={`font-display text-lg font-900 ${isSettled ? "text-emerald-500 line-through" : "text-[#EA580C]"
+                                                            }`}>
+                                                            {trip.currency} {s.amount.toFixed(2)}
+                                                        </p>
+                                                        <ArrowRight className={`w-4 h-4 ${isSettled ? "text-emerald-400" : "text-[#EA580C]"}`} />
+                                                    </div>
+                                                </div>
+
+                                                {/* Receiver */}
+                                                <div className="flex items-center gap-3 flex-1 justify-end">
+                                                    <div className="text-right">
+                                                        <p className={`text-base font-700 ${isSettled ? "text-[#0A0A0A]/40 line-through" : "text-[#0A0A0A]"}`}>
+                                                            {getMemberName(s.to)}
+                                                            {s.to === user._id && <span className="text-xs text-[#EA580C] font-800 ml-1">(YOU)</span>}
+                                                        </p>
+                                                        <p className={`text-[10px] uppercase tracking-wider font-700 ${isSettled ? "text-emerald-400" : "text-emerald-600"
+                                                            }`}>
+                                                            {isSettled ? "Received ✓" : "Recipient"}
+                                                        </p>
+                                                    </div>
+                                                    {getMemberImage(s.to) ? (
+                                                        <img src={getMemberImage(s.to)} className={`w-10 h-10 rounded-full ${isSettled ? "opacity-50" : ""}`} alt="" />
+                                                    ) : (
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-700 ${isSettled ? "bg-emerald-100 text-emerald-400" : "bg-emerald-100 text-emerald-600"
+                                                            }`}>
+                                                            {getMemberName(s.to).charAt(0)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action buttons */}
+                                            {!isSettled ? (
+                                                <div className="mt-3 pt-3 border-t border-[#e5e5e5] flex items-center gap-2">
+                                                    {/* Venmo deep link */}
+                                                    <a
+                                                        href={venmoUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-700 uppercase tracking-wider bg-[#008CFF] text-white hover:bg-[#006BB3] transition-colors"
+                                                    >
+                                                        <CircleDollarSign className="w-3 h-3" />
+                                                        Pay via Venmo
+                                                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                                    </a>
+
+                                                    {/* PayPal deep link */}
+                                                    <a
+                                                        href={paypalUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-700 uppercase tracking-wider bg-[#003087] text-white hover:bg-[#001F5C] transition-colors"
+                                                    >
+                                                        <CreditCard className="w-3 h-3" />
+                                                        Pay via PayPal
+                                                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                                    </a>
+
+                                                    <div className="flex-1" />
+
+                                                    {/* Mark as Settled */}
+                                                    {canEdit && (
+                                                        settlingIndex === i ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <select
+                                                                    value={settleMethod}
+                                                                    onChange={(e) => setSettleMethod(e.target.value as any)}
+                                                                    className="border border-[#e5e5e5] px-2 py-1 text-[10px] bg-white"
+                                                                >
+                                                                    <option value="venmo">Venmo</option>
+                                                                    <option value="paypal">PayPal</option>
+                                                                    <option value="cash">Cash</option>
+                                                                    <option value="bank">Bank Transfer</option>
+                                                                    <option value="other">Other</option>
+                                                                </select>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        await markSettled({
+                                                                            tripId,
+                                                                            fromUserId: s.from as any,
+                                                                            toUserId: s.to as any,
+                                                                            amount: s.amount,
+                                                                            currency: trip.currency,
+                                                                            method: settleMethod,
+                                                                        });
+                                                                        await notifyMembers({
+                                                                            tripId,
+                                                                            type: "budget_updated",
+                                                                            message: `✅ ${getMemberName(s.from)} settled ${trip.currency} ${s.amount.toFixed(2)} with ${getMemberName(s.to)} via ${settleMethod}`,
+                                                                        });
+                                                                        setSettlingIndex(null);
+                                                                        toast.success("Marked as settled!");
+                                                                    }}
+                                                                    className="bg-emerald-600 text-white px-3 py-1 text-[10px] font-700 uppercase tracking-wider hover:bg-emerald-700 transition-colors"
+                                                                >
+                                                                    Confirm
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setSettlingIndex(null)}
+                                                                    className="border border-[#e5e5e5] px-2 py-1 text-[10px] hover:border-[#0A0A0A] transition-colors"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setSettlingIndex(i)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-700 uppercase tracking-wider border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                                            >
+                                                                <CheckCircle className="w-3 h-3" />
+                                                                Mark Settled
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center gap-2">
+                                                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                                    <p className="text-xs text-emerald-600 font-600 flex-1">
+                                                        Settled{matchingSettlement?.method ? ` via ${matchingSettlement.method}` : ""}
+                                                        {matchingSettlement?.settledByUser ? ` • by ${matchingSettlement.settledByUser.name}` : ""}
+                                                        {matchingSettlement?.settledAt ? ` • ${new Date(matchingSettlement.settledAt).toLocaleDateString()}` : ""}
+                                                    </p>
+                                                    {canEdit && matchingSettlement && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                await undoSettlement({ settlementId: matchingSettlement._id });
+                                                                toast.success("Settlement undone");
+                                                            }}
+                                                            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-700 uppercase tracking-wider text-[#0A0A0A]/30 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Undo2 className="w-3 h-3" />
+                                                            Undo
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Settlement history */}
+                            {existingSettlements.length > 0 && (
+                                <div className="mb-8">
+                                    <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-3">SETTLEMENT HISTORY</p>
+                                    <div className="space-y-1">
+                                        {existingSettlements.map((es) => (
+                                            <div key={es._id} className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-100 text-xs">
+                                                <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                                                <span className="text-emerald-700 font-600">
+                                                    {es.fromUser?.name || "Unknown"}
+                                                </span>
+                                                <ArrowRight className="w-3 h-3 text-emerald-300" />
+                                                <span className="text-emerald-700 font-600">
+                                                    {es.toUser?.name || "Unknown"}
+                                                </span>
+                                                <span className="text-emerald-500 font-700">
+                                                    {es.currency} {es.amount.toFixed(2)}
+                                                </span>
+                                                {es.method && (
+                                                    <span className="text-emerald-400 capitalize">
+                                                        via {es.method}
+                                                    </span>
+                                                )}
+                                                <span className="text-emerald-300 ml-auto">
+                                                    {new Date(es.settledAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-3">NET BALANCES</p>
                             <div className="grid grid-cols-2 gap-2">
@@ -608,6 +845,81 @@ export default function BudgetPage({ params }: Props) {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {/* AI Modal */}
+            {(isExplaining || aiExplanation) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm -mt-16">
+                    <div className="bg-white max-w-lg w-full shadow-2xl overflow-hidden border border-[#EA580C]/20 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-[#EA580C] px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-white">
+                                <Sparkles className="w-4 h-4" />
+                                <h3 className="font-700 text-sm uppercase tracking-wider">AI Budget Explanation</h3>
+                            </div>
+                            <button
+                                onClick={() => { setIsExplaining(false); setAiExplanation(null); }}
+                                className="text-white/70 hover:text-white transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            {isExplaining ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <Loader2 className="w-8 h-8 text-[#EA580C] animate-spin mb-4" />
+                                    <p className="font-700 text-[#0A0A0A]">Crunching the numbers...</p>
+                                    <p className="text-xs text-[#0A0A0A]/50 mt-1">Our AI is analyzing {expenses.length} expenses to explain exactly who owes what.</p>
+                                </div>
+                            ) : (
+                                <div className="prose prose-sm prose-orange max-w-none">
+                                    {/* Render simple markdown (bold formatting mostly) */}
+                                    {aiExplanation?.split('\n').map((line, i) => {
+                                        if (line.startsWith('###')) return <h4 key={i} className="text-sm font-800 text-[#0A0A0A] mt-4 mb-2 uppercase tracking-wide">{line.replace('###', '').trim()}</h4>;
+                                        if (line.startsWith('##')) return <h3 key={i} className="text-base font-800 text-[#0A0A0A] mt-5 mb-2">{line.replace('##', '').trim()}</h3>;
+                                        if (line.startsWith('#')) return <h2 key={i} className="text-lg font-900 text-[#0A0A0A] mt-6 mb-3">{line.replace('#', '').trim()}</h2>;
+                                        if (line.startsWith('-')) {
+                                            const content = line.substring(1).trim();
+                                            // Handle bolding
+                                            const parts = content.split(/(\*\*.*?\*\*)/g);
+                                            return (
+                                                <li key={i} className="mb-1 text-sm text-[#0A0A0A]/80">
+                                                    {parts.map((part, j) =>
+                                                        part.startsWith('**') && part.endsWith('**')
+                                                            ? <strong key={j} className="font-700 text-[#0A0A0A]">{part.slice(2, -2)}</strong>
+                                                            : part
+                                                    )}
+                                                </li>
+                                            );
+                                        }
+                                        if (!line.trim()) return <br key={i} />;
+
+                                        // Handle bolding for regular paragraphs
+                                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                                        return (
+                                            <p key={i} className="mb-3 text-sm text-[#0A0A0A]/80 leading-relaxed">
+                                                {parts.map((part, j) =>
+                                                    part.startsWith('**') && part.endsWith('**')
+                                                        ? <strong key={j} className="font-700 text-[#0A0A0A]">{part.slice(2, -2)}</strong>
+                                                        : part
+                                                )}
+                                            </p>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        {!isExplaining && (
+                            <div className="bg-[#0A0A0A]/5 px-6 py-4 flex justify-end border-t border-[#e5e5e5]">
+                                <button
+                                    onClick={() => { setIsExplaining(false); setAiExplanation(null); }}
+                                    className="bg-[#EA580C] text-white px-5 py-2 text-xs font-700 uppercase tracking-wider hover:bg-[#EA580C]/80 transition-colors"
+                                >
+                                    Got it
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
