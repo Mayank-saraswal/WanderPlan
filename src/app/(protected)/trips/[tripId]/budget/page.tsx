@@ -77,10 +77,9 @@ export default function BudgetPage({ params }: Props) {
             if (!res.ok) throw new Error("AI request failed");
             const data = await res.json();
             if (data.breakdown) {
-                const validCategories: string[] = [...CATEGORIES];
                 for (const b of data.breakdown) {
                     const normalized = b.category.toLowerCase().replace(/[^a-z]/g, "");
-                    const category = validCategories.includes(normalized) ? normalized as typeof CATEGORIES[number] : "other";
+                    const category = (CATEGORIES as readonly string[]).includes(normalized) ? normalized as typeof CATEGORIES[number] : "other";
                     await createExpense({
                         tripId, title: b.category, amount: b.estimated, currency: trip.currency,
                         category,
