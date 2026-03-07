@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Barlow_Condensed } from "next/font/google";
+import { DM_Sans, Bebas_Neue, DM_Mono } from "next/font/google";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -8,10 +8,16 @@ const dmSans = DM_Sans({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-const barlowCondensed = Barlow_Condensed({
+const bebasNeue = Bebas_Neue({
+  weight: "400",
   subsets: ["latin"],
-  variable: "--font-barlow-condensed",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-bebas",
+});
+
+const dmMono = DM_Mono({
+  weight: ["400", "500"],
+  subsets: ["latin"],
+  variable: "--font-dm-mono",
 });
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -36,7 +42,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`antialiased ${dmSans.variable} ${barlowCondensed.variable} font-sans`} suppressHydrationWarning>
+      <body className={`antialiased ${bebasNeue.variable} ${dmSans.variable} ${dmMono.variable} font-sans`} suppressHydrationWarning>
         <ClerkProvider>
           <ConvexClientProvider>
             {children}

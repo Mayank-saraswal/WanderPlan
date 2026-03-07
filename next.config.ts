@@ -4,7 +4,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [

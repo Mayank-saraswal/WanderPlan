@@ -380,7 +380,7 @@ export default function ItineraryPage({ params }: Props) {
                 startDate: trip.startDate,
                 endDate: trip.endDate,
                 currency: trip.currency,
-                budget: trip.budget,
+                budget: trip.totalBudget,
             };
             if (aiPrompt.trim()) {
                 contextPayload.preferences = aiPrompt.trim();
