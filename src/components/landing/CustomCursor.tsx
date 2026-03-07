@@ -40,6 +40,7 @@ export function CustomCursor() {
         return () => {
             document.removeEventListener("mousemove", handleMouseMove);
             cancelAnimationFrame(animationFrameId);
+            document.body.style.cursor = '';
         };
     }, []);
 
