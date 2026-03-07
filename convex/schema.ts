@@ -206,7 +206,11 @@ export default defineSchema({
             v.literal("file_uploaded"),
             v.literal("reservation_added"),
             v.literal("checklist_updated"),
-            v.literal("idea_proposed")
+            v.literal("idea_proposed"),
+            v.literal("idea_voted"),
+            v.literal("idea_status_changed"),
+            v.literal("expense_added"),
+            v.literal("expense_deleted")
         ),
         message: v.string(),
         actorId: v.id("users"),

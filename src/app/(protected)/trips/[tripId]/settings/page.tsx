@@ -142,7 +142,7 @@ export default function SettingsPage({ params }: Props) {
                         </div>
                     </div>
                     <button onClick={handleSave} disabled={!isDirty || saving}
-                        className="mt-6 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-8 py-3 hover:bg-[#EA580C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        className="mt-6 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-8 py-3 hover:bg-[#C2410C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         {saving ? "Saving..." : "Save Changes"}
                     </button>
                 </section>
@@ -174,7 +174,7 @@ export default function SettingsPage({ params }: Props) {
                         <input type="text" value={deleteConfirmName} onChange={(e) => setDeleteConfirmName(e.target.value)}
                             placeholder={trip.title} className="w-full border border-[#e5e5e5] px-4 py-3 text-sm focus:outline-none focus:border-red-600 mb-6" />
                         <div className="flex gap-3">
-                            <button onClick={() => setDeleteConfirm(false)} className="flex-1 border border-[#0A0A0A] py-2.5 text-sm font-600 uppercase hover:bg-[#0A0A0A] hover:text-white transition-colors">
+                            <button onClick={() => setDeleteConfirm(false)} className="flex-1 border border-[#0A0A0A] py-2.5 text-sm font-600 uppercase hover:bg-[#EA580C] hover:text-white transition-colors">
                                 Cancel
                             </button>
                             <button onClick={handleDelete} disabled={deleteConfirmName !== trip.title}

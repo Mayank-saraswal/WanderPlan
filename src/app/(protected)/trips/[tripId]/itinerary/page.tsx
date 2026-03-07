@@ -131,7 +131,7 @@ function CommentPanel({
                         <button
                             onClick={handleSend}
                             disabled={!newComment.trim()}
-                            className="bg-[#0A0A0A] text-white px-3 py-2.5 hover:bg-[#EA580C] transition-colors disabled:opacity-30"
+                            className="bg-[#EA580C] text-white px-3 py-2.5 hover:bg-[#C2410C] transition-colors disabled:opacity-30"
                         >
                             <Send className="w-4 h-4" />
                         </button>
@@ -441,7 +441,7 @@ export default function ItineraryPage({ params }: Props) {
                     <button
                         onClick={() => setShowAIDialog(true)}
                         disabled={aiLoading}
-                        className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#EA580C] transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-2 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#C2410C] transition-colors disabled:opacity-50"
                     >
                         <Sparkles className="w-4 h-4" />
                         {aiLoading ? "Generating..." : "AI Generate Itinerary"}
@@ -605,7 +605,7 @@ export default function ItineraryPage({ params }: Props) {
                                     </select>
                                     <div className="flex gap-2">
                                         <button onClick={handleAddActivity}
-                                            className="flex-1 bg-[#0A0A0A] text-white py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#EA580C] transition-colors">
+                                            className="flex-1 bg-[#EA580C] text-white py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors">
                                             <Check className="w-4 h-4 inline mr-1" />Add
                                         </button>
                                         <button onClick={() => setShowForm(false)}

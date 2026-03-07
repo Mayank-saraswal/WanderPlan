@@ -76,7 +76,7 @@ export default function ChecklistsPage({ params }: Props) {
                         onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                         className="flex-1 border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" />
                     <button onClick={handleCreate} disabled={!newListTitle}
-                        className="bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-5 py-2.5 hover:bg-[#EA580C] transition-colors disabled:opacity-50 flex items-center gap-2">
+                        className="bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-5 py-2.5 hover:bg-[#C2410C] transition-colors disabled:opacity-50 flex items-center gap-2">
                         <Plus className="w-4 h-4" /> Add
                     </button>
                 </div>

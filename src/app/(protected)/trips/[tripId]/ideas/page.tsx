@@ -69,9 +69,10 @@ export default function IdeasPage({ params }: Props) {
         } catch (e: any) { toast.error(e.message); }
     };
 
-    const handleVote = async (ideaId: string, vote: "up" | "down") => {
+    const handleVote = async (ideaId: string, ideaTitle: string, vote: "up" | "down") => {
         try {
             await castVote({ ideaId: ideaId as Id<"ideas">, vote });
+            await notifyMembers({ tripId, type: "idea_voted", message: `${vote === "up" ? "👍 Upvoted" : "👎 Downvoted"} idea: ${ideaTitle}` });
         } catch (e: any) { toast.error(e.message); }
     };
 
@@ -80,8 +81,9 @@ export default function IdeasPage({ params }: Props) {
         return v?.vote || null;
     };
 
-    const handleStatus = async (ideaId: string, status: "accepted" | "rejected" | "proposed") => {
+    const handleStatus = async (ideaId: string, ideaTitle: string, status: "accepted" | "rejected" | "proposed") => {
         await updateStatus({ ideaId: ideaId as Id<"ideas">, status });
+        await notifyMembers({ tripId, type: "idea_status_changed", message: `Idea ${status}: ${ideaTitle}` });
         toast.success(`Idea ${status}`);
     };
 
@@ -111,11 +113,10 @@ export default function IdeasPage({ params }: Props) {
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`px-5 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors ${
-                            filter === f
-                                ? "border-[#EA580C] text-[#0A0A0A]"
-                                : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
-                        }`}
+                        className={`px-5 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors ${filter === f
+                            ? "border-[#EA580C] text-[#0A0A0A]"
+                            : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
+                            }`}
                     >
                         {f}
                         <span className="ml-1.5 text-[10px] text-[#0A0A0A]/30">
@@ -160,7 +161,7 @@ export default function IdeasPage({ params }: Props) {
                         </div>
                         <div className="flex gap-2">
                             <button onClick={handlePropose}
-                                className="bg-[#0A0A0A] text-white px-5 py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#EA580C] transition-colors">
+                                className="bg-[#EA580C] text-white px-5 py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors">
                                 Submit Idea
                             </button>
                             <button onClick={() => setShowForm(false)}
@@ -195,27 +196,24 @@ export default function IdeasPage({ params }: Props) {
                                         {/* Voting column */}
                                         <div className="flex flex-col items-center px-4 py-4 border-r border-[#e5e5e5] gap-1">
                                             <button
-                                                onClick={() => handleVote(idea._id, "up")}
-                                                className={`p-1.5 transition-colors ${
-                                                    userVote === "up"
-                                                        ? "text-emerald-600 bg-emerald-50"
-                                                        : "text-[#0A0A0A]/20 hover:text-emerald-600 hover:bg-emerald-50"
-                                                }`}
+                                                onClick={() => handleVote(idea._id, idea.title, "up")}
+                                                className={`p-1.5 transition-colors ${userVote === "up"
+                                                    ? "text-emerald-600 bg-emerald-50"
+                                                    : "text-[#0A0A0A]/20 hover:text-emerald-600 hover:bg-emerald-50"
+                                                    }`}
                                             >
                                                 <ThumbsUp className="w-4 h-4" />
                                             </button>
-                                            <span className={`font-display text-lg font-900 ${
-                                                idea.score > 0 ? "text-emerald-600" : idea.score < 0 ? "text-red-500" : "text-[#0A0A0A]/30"
-                                            }`}>
+                                            <span className={`font-display text-lg font-900 ${idea.score > 0 ? "text-emerald-600" : idea.score < 0 ? "text-red-500" : "text-[#0A0A0A]/30"
+                                                }`}>
                                                 {idea.score}
                                             </span>
                                             <button
-                                                onClick={() => handleVote(idea._id, "down")}
-                                                className={`p-1.5 transition-colors ${
-                                                    userVote === "down"
-                                                        ? "text-red-500 bg-red-50"
-                                                        : "text-[#0A0A0A]/20 hover:text-red-500 hover:bg-red-50"
-                                                }`}
+                                                onClick={() => handleVote(idea._id, idea.title, "down")}
+                                                className={`p-1.5 transition-colors ${userVote === "down"
+                                                    ? "text-red-500 bg-red-50"
+                                                    : "text-[#0A0A0A]/20 hover:text-red-500 hover:bg-red-50"
+                                                    }`}
                                             >
                                                 <ThumbsDown className="w-4 h-4" />
                                             </button>
@@ -267,7 +265,7 @@ export default function IdeasPage({ params }: Props) {
                                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         {idea.status !== "accepted" && (
                                                             <button
-                                                                onClick={() => handleStatus(idea._id, "accepted")}
+                                                                onClick={() => handleStatus(idea._id, idea.title, "accepted")}
                                                                 className="p-1.5 text-[#0A0A0A]/20 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                                                                 title="Accept"
                                                             >
@@ -276,7 +274,7 @@ export default function IdeasPage({ params }: Props) {
                                                         )}
                                                         {idea.status !== "rejected" && (
                                                             <button
-                                                                onClick={() => handleStatus(idea._id, "rejected")}
+                                                                onClick={() => handleStatus(idea._id, idea.title, "rejected")}
                                                                 className="p-1.5 text-[#0A0A0A]/20 hover:text-red-500 hover:bg-red-50 transition-colors"
                                                                 title="Reject"
                                                             >
@@ -284,7 +282,7 @@ export default function IdeasPage({ params }: Props) {
                                                             </button>
                                                         )}
                                                         <button
-                                                            onClick={() => { deleteIdea({ ideaId: idea._id as Id<"ideas"> }); toast.success("Deleted"); }}
+                                                            onClick={async () => { await deleteIdea({ ideaId: idea._id as Id<"ideas"> }); await notifyMembers({ tripId, type: "idea_status_changed", message: `Deleted idea: ${idea.title}` }); toast.success("Deleted"); }}
                                                             className="p-1.5 text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
                                                             title="Delete"
                                                         >

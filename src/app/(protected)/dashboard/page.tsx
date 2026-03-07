@@ -195,7 +195,7 @@ export default function DashboardPage() {
                     </div>
                     <Link
                         href="/trips/new"
-                        className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#EA580C] transition-colors"
+                        className="inline-flex items-center gap-2 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#C2410C] transition-colors"
                     >
                         <Plus className="w-4 h-4" strokeWidth={2} />
                         New Trip
@@ -242,7 +242,7 @@ export default function DashboardPage() {
                             action={
                                 <Link
                                     href="/trips/new"
-                                    className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-6 py-3 hover:bg-[#EA580C] transition-colors"
+                                    className="inline-flex items-center gap-2 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-6 py-3 hover:bg-[#C2410C] transition-colors"
                                 >
                                     <Plus className="w-4 h-4" strokeWidth={2} />
                                     Create First Trip
