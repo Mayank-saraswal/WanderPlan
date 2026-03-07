@@ -6,9 +6,10 @@ import { Id } from "@/convex/_generated/dataModel";
 import { PageLoader, EmptyState } from "@/components/shared/EmptyState";
 import { useTripMember } from "@/hooks/useTripMember";
 import { toast } from "sonner";
-import { Paperclip, Upload, Trash2, Download, FileText, Image, File } from "lucide-react";
+import { Paperclip, Upload, Trash2, Download, FileText, Image, File, Tag } from "lucide-react";
 
 const CAT_TABS = ["all", "ticket", "document", "image", "other"] as const;
+type FileCategory = "ticket" | "document" | "image" | "other";
 
 type Props = { params: Promise<{ tripId: string }> };
 
@@ -24,6 +25,53 @@ function formatSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function detectCategory(file: { name: string; type: string }): FileCategory {
+    const name = file.name.toLowerCase();
+    const type = file.type.toLowerCase();
+
+    // Check filename keywords for tickets
+    if (
+        name.includes("ticket") ||
+        name.includes("boarding") ||
+        name.includes("booking") ||
+        name.includes("reservation") ||
+        name.includes("pass") ||
+        name.includes("confirmation") ||
+        name.includes("e-ticket") ||
+        name.includes("eticket")
+    ) {
+        return "ticket";
+    }
+
+    // Images
+    if (type.startsWith("image/")) return "image";
+
+    // Documents (PDF, Word, Excel, text, etc.)
+    if (
+        type.includes("pdf") ||
+        type.includes("msword") ||
+        type.includes("wordprocessingml") ||
+        type.includes("spreadsheet") ||
+        type.includes("excel") ||
+        type.includes("presentation") ||
+        type.includes("powerpoint") ||
+        type.includes("text/plain") ||
+        type.includes("text/csv") ||
+        name.endsWith(".doc") ||
+        name.endsWith(".docx") ||
+        name.endsWith(".xls") ||
+        name.endsWith(".xlsx") ||
+        name.endsWith(".ppt") ||
+        name.endsWith(".pptx") ||
+        name.endsWith(".txt") ||
+        name.endsWith(".csv")
+    ) {
+        return "document";
+    }
+
+    return "other";
+}
+
 export default function FilesPage({ params }: Props) {
     const { tripId: rawTripId } = use(params);
     const tripId = rawTripId as Id<"trips">;
@@ -32,9 +80,11 @@ export default function FilesPage({ params }: Props) {
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
     const saveFile = useMutation(api.files.saveFile);
     const deleteFile = useMutation(api.files.deleteFile);
+    const notifyMembers = useMutation(api.notifications.notifyTripMembers);
 
     const [tab, setTab] = useState<typeof CAT_TABS[number]>("all");
     const [uploading, setUploading] = useState(false);
+    const [uploadCategory, setUploadCategory] = useState<FileCategory | "auto">("auto");
 
     if (!files) return <PageLoader />;
 
@@ -51,13 +101,14 @@ export default function FilesPage({ params }: Props) {
             const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
             const { storageId } = await res.json();
 
-            const cat = file.type.includes("image") ? "image"
-                : file.type.includes("pdf") ? "document"
-                    : file.name.toLowerCase().includes("ticket") ? "ticket"
-                        : "other";
+            // Use manual category if selected, otherwise auto-detect
+            const cat: FileCategory = uploadCategory !== "auto"
+                ? uploadCategory
+                : detectCategory(file);
 
             await saveFile({ tripId, name: file.name, storageId, type: file.type, size: file.size, category: cat });
-            toast.success("File uploaded!");
+            await notifyMembers({ tripId, type: "file_uploaded", message: `Uploaded file: ${file.name} (${cat})` });
+            toast.success(`File uploaded to ${cat}!`);
         } catch (err: any) {
             toast.error("Upload failed: " + err.message);
         } finally {
@@ -75,25 +126,57 @@ export default function FilesPage({ params }: Props) {
             {/* Upload zone */}
             {canEdit && (
                 <div className="px-8 py-6 border-b border-[#e5e5e5]">
+                    {/* Category selector */}
+                    <div className="flex items-center gap-3 mb-4">
+                        <Tag className="w-4 h-4 text-[#0A0A0A]/40" strokeWidth={1.5} />
+                        <span className="text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/40">Upload to:</span>
+                        <div className="flex gap-1">
+                            {(["auto", "ticket", "document", "image", "other"] as const).map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setUploadCategory(cat)}
+                                    className={`px-3 py-1.5 text-xs font-700 uppercase tracking-wider transition-colors ${uploadCategory === cat
+                                        ? "bg-[#EA580C] text-white"
+                                        : "border border-[#e5e5e5] text-[#0A0A0A]/50 hover:border-[#0A0A0A]"
+                                        }`}
+                                >
+                                    {cat === "auto" ? "Auto-detect" : cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <label className="block border-2 border-dashed border-[#e5e5e5] hover:border-[#EA580C] transition-colors cursor-pointer py-10 text-center group">
                         <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
                         <Paperclip className="w-6 h-6 text-[#EA580C] mx-auto mb-3" strokeWidth={1.5} />
                         <p className="font-display text-base font-700 uppercase tracking-wider text-[#0A0A0A] group-hover:text-[#EA580C] transition-colors">
                             {uploading ? "Uploading..." : "DROP FILES HERE"}
                         </p>
-                        <p className="text-[#0A0A0A]/40 text-xs mt-1">or click to upload — max 10MB</p>
+                        <p className="text-[#0A0A0A]/40 text-xs mt-1">
+                            {uploadCategory === "auto"
+                                ? "Category will be auto-detected — or select above"
+                                : `Will upload to ${uploadCategory} folder`
+                            }
+                        </p>
                     </label>
                 </div>
             )}
 
             {/* Tabs */}
             <div className="border-b border-[#e5e5e5] px-8 flex gap-0">
-                {CAT_TABS.map((t) => (
-                    <button key={t} onClick={() => setTab(t)}
-                        className={`px-4 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors ${tab === t ? "border-[#EA580C] text-[#0A0A0A]" : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"}`}>
-                        {t}
-                    </button>
-                ))}
+                {CAT_TABS.map((t) => {
+                    const count = t === "all" ? files.length : files.filter((f: any) => f.category === t).length;
+                    return (
+                        <button key={t} onClick={() => setTab(t)}
+                            className={`px-4 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors flex items-center gap-1.5 ${tab === t ? "border-[#EA580C] text-[#0A0A0A]" : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"}`}>
+                            {t}
+                            {count > 0 && (
+                                <span className={`text-[10px] font-800 w-4 h-4 flex items-center justify-center rounded-full ${tab === t ? "bg-[#EA580C] text-white" : "bg-[#e5e5e5] text-[#0A0A0A]/50"}`}>
+                                    {count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Files grid */}
@@ -112,7 +195,16 @@ export default function FilesPage({ params }: Props) {
                                     )}
                                 </div>
                                 <p className="text-xs font-600 text-[#0A0A0A] truncate mb-1">{f.name}</p>
-                                <p className="text-xs text-[#0A0A0A]/40">{formatSize(f.size)}</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-[#0A0A0A]/40">{formatSize(f.size)}</p>
+                                    <span className={`text-[10px] font-700 uppercase tracking-wider px-1.5 py-0.5 ${f.category === "ticket" ? "bg-[#EA580C]/10 text-[#EA580C]"
+                                        : f.category === "document" ? "bg-[#0A0A0A]/10 text-[#0A0A0A]"
+                                            : f.category === "image" ? "bg-blue-50 text-blue-600"
+                                                : "bg-gray-100 text-gray-500"
+                                        }`}>
+                                        {f.category}
+                                    </span>
+                                </div>
                                 {f.uploader && (
                                     <p className="text-xs text-[#0A0A0A]/30 flex items-center gap-1 mt-1 truncate">
                                         {f.uploader.imageUrl && <img src={f.uploader.imageUrl} className="w-3 h-3 rounded-full" />}

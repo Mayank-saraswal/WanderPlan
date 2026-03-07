@@ -76,7 +76,7 @@ export default defineSchema({
             v.literal("other")
         ),
         order: v.number(),
-        aiGenerated: v.boolean(),
+        aiGenerated: v.optional(v.boolean()),
         createdBy: v.id("users"),
     })
         .index("by_day", ["dayId"])
@@ -191,5 +191,61 @@ export default defineSchema({
         used: v.boolean(),
     })
         .index("by_token", ["token"])
+        .index("by_trip", ["tripId"])
+        .index("by_email", ["email"]),
+
+    notifications: defineTable({
+        userId: v.id("users"),
+        tripId: v.id("trips"),
+        type: v.union(
+            v.literal("itinerary_updated"),
+            v.literal("budget_updated"),
+            v.literal("member_joined"),
+            v.literal("member_removed"),
+            v.literal("trip_updated"),
+            v.literal("file_uploaded"),
+            v.literal("reservation_added"),
+            v.literal("checklist_updated"),
+            v.literal("idea_proposed")
+        ),
+        message: v.string(),
+        actorId: v.id("users"),
+        read: v.boolean(),
+        createdAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_read", ["userId", "read"])
         .index("by_trip", ["tripId"]),
+
+    ideas: defineTable({
+        tripId: v.id("trips"),
+        title: v.string(),
+        description: v.optional(v.string()),
+        category: v.union(
+            v.literal("accommodation"),
+            v.literal("restaurant"),
+            v.literal("activity"),
+            v.literal("transport"),
+            v.literal("other")
+        ),
+        link: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+        status: v.union(
+            v.literal("proposed"),
+            v.literal("accepted"),
+            v.literal("rejected")
+        ),
+        proposedBy: v.id("users"),
+        createdAt: v.number(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_status", ["tripId", "status"]),
+
+    votes: defineTable({
+        ideaId: v.id("ideas"),
+        userId: v.id("users"),
+        vote: v.union(v.literal("up"), v.literal("down")),
+    })
+        .index("by_idea", ["ideaId"])
+        .index("by_idea_user", ["ideaId", "userId"]),
 });
