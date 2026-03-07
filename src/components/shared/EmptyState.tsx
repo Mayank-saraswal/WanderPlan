@@ -66,8 +66,8 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, description, 
                     <button
                         onClick={() => { onConfirm(); onClose(); }}
                         className={`flex-1 py-2.5 text-sm font-600 uppercase tracking-wider transition-colors ${isDestructive
-                                ? "bg-red-600 text-white hover:bg-red-700"
-                                : "bg-[#0A0A0A] text-white hover:bg-[#EA580C]"
+                            ? "bg-red-600 text-white hover:bg-red-700"
+                            : "bg-[#0A0A0A] text-white hover:bg-[#EA580C]"
                             }`}
                     >
                         {confirmLabel}
