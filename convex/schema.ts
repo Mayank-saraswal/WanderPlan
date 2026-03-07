@@ -193,4 +193,26 @@ export default defineSchema({
         .index("by_token", ["token"])
         .index("by_trip", ["tripId"])
         .index("by_email", ["email"]),
+
+    notifications: defineTable({
+        userId: v.id("users"),
+        tripId: v.id("trips"),
+        type: v.union(
+            v.literal("itinerary_updated"),
+            v.literal("budget_updated"),
+            v.literal("member_joined"),
+            v.literal("member_removed"),
+            v.literal("trip_updated"),
+            v.literal("file_uploaded"),
+            v.literal("reservation_added"),
+            v.literal("checklist_updated")
+        ),
+        message: v.string(),
+        actorId: v.id("users"),
+        read: v.boolean(),
+        createdAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_read", ["userId", "read"])
+        .index("by_trip", ["tripId"]),
 });

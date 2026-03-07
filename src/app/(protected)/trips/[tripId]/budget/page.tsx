@@ -29,6 +29,7 @@ export default function BudgetPage({ params }: Props) {
     const members = useQuery(api.tripMembers.getTripMembers, { tripId });
     const createExpense = useMutation(api.expenses.createExpense);
     const deleteExpense = useMutation(api.expenses.deleteExpense);
+    const notifyMembers = useMutation(api.notifications.notifyTripMembers);
 
     const [showForm, setShowForm] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
@@ -61,6 +62,7 @@ export default function BudgetPage({ params }: Props) {
                 date: Date.now(),
                 notes: form.notes || undefined,
             });
+            await notifyMembers({ tripId, type: "budget_updated", message: `Added expense: ${form.title} (${trip.currency} ${form.amount})` });
             setForm({ title: "", amount: "", category: "food", notes: "" });
             setShowForm(false);
             toast.success("Expense added!");
@@ -93,6 +95,7 @@ export default function BudgetPage({ params }: Props) {
                         paidBy: user._id, splitWith: [], date: Date.now(), notes: b.notes,
                     });
                 }
+                await notifyMembers({ tripId, type: "budget_updated", message: `AI budget estimate generated for ${trip.destination}` });
                 toast.success("AI budget estimate added!");
             }
         } catch { toast.error("AI budget failed"); } finally { setAiLoading(false); }

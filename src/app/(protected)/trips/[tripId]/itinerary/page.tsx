@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { PageLoader, EmptyState } from "@/components/shared/EmptyState";
-import { GripVertical, Plus, Pencil, Trash2, Clock, MapPin, DollarSign, Sparkles, X, Check } from "lucide-react";
+import { GripVertical, Plus, Pencil, Trash2, Clock, MapPin, DollarSign, Sparkles, X, Check, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useTripMember } from "@/hooks/useTripMember";
 import { format } from "date-fns";
@@ -21,6 +21,17 @@ const CATEGORIES = ["transport", "accommodation", "food", "activity", "other"] a
 
 type Props = { params: Promise<{ tripId: string }> };
 
+type EditingActivity = {
+    _id: string;
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+    cost: string;
+    category: typeof CATEGORIES[number];
+};
+
 export default function ItineraryPage({ params }: Props) {
     const { tripId: rawTripId } = use(params);
     const tripId = rawTripId as Id<"trips">;
@@ -30,8 +41,14 @@ export default function ItineraryPage({ params }: Props) {
     const [activeDay, setActiveDay] = useState(0);
     const [showForm, setShowForm] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
+    const [showAIDialog, setShowAIDialog] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState("");
+    const [aiMode, setAiMode] = useState<"quick" | "detailed">("quick");
+    const [editingActivity, setEditingActivity] = useState<EditingActivity | null>(null);
     const createActivity = useMutation(api.activities.createActivity);
+    const updateActivity = useMutation(api.activities.updateActivity);
     const deleteActivity = useMutation(api.activities.deleteActivity);
+    const notifyMembers = useMutation(api.notifications.notifyTripMembers);
 
     const [form, setForm] = useState({
         title: "",
@@ -46,49 +63,144 @@ export default function ItineraryPage({ params }: Props) {
     if (!days || !trip) return <PageLoader />;
 
     const currentDay = days[activeDay];
+
+    const handleEditStart = (a: any) => {
+        setEditingActivity({
+            _id: a._id,
+            title: a.title || "",
+            description: a.description || "",
+            startTime: a.startTime || "",
+            endTime: a.endTime || "",
+            location: a.location || "",
+            cost: a.cost?.toString() || "",
+            category: a.category || "activity",
+        });
+    };
+
+    const handleEditSave = async () => {
+        if (!editingActivity) return;
+        try {
+            await updateActivity({
+                activityId: editingActivity._id as Id<"activities">,
+                title: editingActivity.title,
+                description: editingActivity.description || undefined,
+                startTime: editingActivity.startTime || undefined,
+                endTime: editingActivity.endTime || undefined,
+                location: editingActivity.location || undefined,
+                cost: editingActivity.cost ? parseFloat(editingActivity.cost) : undefined,
+                category: editingActivity.category,
+            });
+            await notifyMembers({ tripId, type: "itinerary_updated", message: `Updated activity: ${editingActivity.title}` });
+            setEditingActivity(null);
+            toast.success("Activity updated!");
+        } catch (e: any) {
+            toast.error(e.message);
+        }
+    };
+
     const ActivitiesForDay = ({ dayId }: { dayId: Id<"days"> }) => {
         const activities = useQuery(api.activities.getActivitiesByDay, { dayId });
         if (!activities) return <div className="h-2 bg-gray-100 animate-pulse rounded" />;
         return (
             <div className="space-y-2">
                 {activities.map((a) => (
-                    <div key={a._id} className={`bg-white border border-[#e5e5e5] border-l-4 ${CATEGORY_COLORS[a.category as keyof typeof CATEGORY_COLORS] || "border-l-gray-300"} p-4 flex items-start gap-3 group`}>
-                        {canEdit && <GripVertical className="w-4 h-4 text-[#0A0A0A]/20 mt-0.5 cursor-grab flex-shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                                <p className="font-600 text-sm text-[#0A0A0A]">{a.title}</p>
-                                {a.startTime && (
-                                    <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 font-mono">
-                                        {a.startTime}{a.endTime && `–${a.endTime}`}
-                                    </span>
+                    editingActivity && editingActivity._id === a._id ? (
+                        /* ── Inline Edit Form ── */
+                        <div key={a._id} className="border border-[#EA580C] border-l-4 border-l-[#EA580C] p-4 bg-[#EA580C]/5">
+                            <h3 className="font-display text-xs font-700 uppercase tracking-wider text-[#EA580C] mb-3 flex items-center gap-1">
+                                <Pencil className="w-3 h-3" /> Edit Activity
+                            </h3>
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    placeholder="Activity name *"
+                                    value={editingActivity.title}
+                                    onChange={(e) => setEditingActivity({ ...editingActivity, title: e.target.value })}
+                                    className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]"
+                                />
+                                <textarea
+                                    placeholder="Description"
+                                    value={editingActivity.description}
+                                    onChange={(e) => setEditingActivity({ ...editingActivity, description: e.target.value })}
+                                    className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A] resize-none h-16"
+                                />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="time" value={editingActivity.startTime} onChange={(e) => setEditingActivity({ ...editingActivity, startTime: e.target.value })}
+                                        className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" />
+                                    <input type="time" value={editingActivity.endTime} onChange={(e) => setEditingActivity({ ...editingActivity, endTime: e.target.value })}
+                                        className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="text" value={editingActivity.location} onChange={(e) => setEditingActivity({ ...editingActivity, location: e.target.value })}
+                                        className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" placeholder="Location" />
+                                    <input type="number" value={editingActivity.cost} onChange={(e) => setEditingActivity({ ...editingActivity, cost: e.target.value })}
+                                        className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" placeholder="Cost" />
+                                </div>
+                                <select value={editingActivity.category} onChange={(e) => setEditingActivity({ ...editingActivity, category: e.target.value as any })}
+                                    className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A] bg-white capitalize">
+                                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <div className="flex gap-2">
+                                    <button onClick={handleEditSave}
+                                        className="flex-1 bg-[#EA580C] text-white py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors flex items-center justify-center gap-1">
+                                        <Check className="w-4 h-4" /> Save Changes
+                                    </button>
+                                    <button onClick={() => setEditingActivity(null)}
+                                        className="border border-[#e5e5e5] px-4 py-2.5 text-xs hover:border-[#0A0A0A] transition-colors">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* ── Normal Activity Display ── */
+                        <div key={a._id} className={`bg-white border border-[#e5e5e5] border-l-4 ${CATEGORY_COLORS[a.category as keyof typeof CATEGORY_COLORS] || "border-l-gray-300"} p-4 flex items-start gap-3 group`}>
+                            {canEdit && <GripVertical className="w-4 h-4 text-[#0A0A0A]/20 mt-0.5 cursor-grab flex-shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-600 text-sm text-[#0A0A0A]">{a.title}</p>
+                                    {a.startTime && (
+                                        <span className="bg-[#0A0A0A] text-white text-xs px-2 py-0.5 font-mono">
+                                            {a.startTime}{a.endTime && `–${a.endTime}`}
+                                        </span>
+                                    )}
+                                    {a.aiGenerated && (
+                                        <span className="border border-[#EA580C]/30 text-[#EA580C] text-xs px-1.5 py-0.5 flex items-center gap-1">
+                                            <Sparkles className="w-2.5 h-2.5" /> AI
+                                        </span>
+                                    )}
+                                </div>
+                                {a.location && (
+                                    <p className="text-xs text-[#0A0A0A]/50 flex items-center gap-1">
+                                        <MapPin className="w-3 h-3" /> {a.location}
+                                    </p>
                                 )}
-                                {a.aiGenerated && (
-                                    <span className="border border-[#EA580C]/30 text-[#EA580C] text-xs px-1.5 py-0.5 flex items-center gap-1">
-                                        <Sparkles className="w-2.5 h-2.5" /> AI
-                                    </span>
+                                {a.description && <p className="text-xs text-[#0A0A0A]/50 mt-1">{a.description}</p>}
+                            </div>
+                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {a.cost && (
+                                    <span className="text-[#EA580C] font-700 text-sm">{trip?.currency} {a.cost}</span>
+                                )}
+                                {canEdit && (
+                                    <>
+                                        <button
+                                            onClick={() => handleEditStart(a)}
+                                            className="text-[#0A0A0A]/30 hover:text-[#EA580C] transition-colors"
+                                            title="Edit activity"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => { deleteActivity({ activityId: a._id }); toast.success("Deleted"); }}
+                                            className="text-[#0A0A0A]/30 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </>
                                 )}
                             </div>
-                            {a.location && (
-                                <p className="text-xs text-[#0A0A0A]/50 flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" /> {a.location}
-                                </p>
-                            )}
-                            {a.description && <p className="text-xs text-[#0A0A0A]/50 mt-1">{a.description}</p>}
                         </div>
-                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {a.cost && (
-                                <span className="text-[#EA580C] font-700 text-sm">{trip?.currency} {a.cost}</span>
-                            )}
-                            {canEdit && (
-                                <button
-                                    onClick={() => { deleteActivity({ activityId: a._id }); toast.success("Deleted"); }}
-                                    className="text-[#0A0A0A]/30 hover:text-red-500 transition-colors"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
+                    )
                 ))}
                 {activities.length === 0 && !showForm && (
                     <p className="text-[#0A0A0A]/30 text-sm py-4 text-center">No activities yet for this day</p>
@@ -114,6 +226,7 @@ export default function ItineraryPage({ params }: Props) {
                 order: 0,
                 aiGenerated: false,
             });
+            await notifyMembers({ tripId, type: "itinerary_updated", message: `Added activity: ${form.title}` });
             setForm({ title: "", description: "", startTime: "", endTime: "", location: "", cost: "", category: "activity" });
             setShowForm(false);
             toast.success("Activity added!");
@@ -124,14 +237,30 @@ export default function ItineraryPage({ params }: Props) {
 
     const handleAIGenerate = async () => {
         setAiLoading(true);
+        setShowAIDialog(false);
         try {
             const dayCount = days.length;
+            const contextPayload: any = {
+                destination: trip.destination,
+                days: dayCount,
+                travelers: 2,
+            };
+
+            // Add user's preferences if they provided details
+            if (aiPrompt.trim()) {
+                contextPayload.preferences = aiPrompt.trim();
+            }
+            if (aiMode === "detailed") {
+                contextPayload.detailed = true;
+                contextPayload.researchBased = true;
+            }
+
             const res = await fetch("/api/ai/suggest", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     type: "itinerary",
-                    context: { destination: trip.destination, days: dayCount, travelers: 2 },
+                    context: contextPayload,
                 }),
             });
             const data = await res.json();
@@ -157,12 +286,14 @@ export default function ItineraryPage({ params }: Props) {
                         });
                     }
                 }
+                await notifyMembers({ tripId, type: "itinerary_updated", message: `AI itinerary generated for ${trip.destination}` });
                 toast.success("AI itinerary generated!");
             }
         } catch {
             toast.error("AI generation failed");
         } finally {
             setAiLoading(false);
+            setAiPrompt("");
         }
     };
 
@@ -173,7 +304,7 @@ export default function ItineraryPage({ params }: Props) {
                 <h1 className="font-display text-3xl font-900 uppercase text-[#0A0A0A]">ITINERARY</h1>
                 {canEdit && (
                     <button
-                        onClick={handleAIGenerate}
+                        onClick={() => setShowAIDialog(true)}
                         disabled={aiLoading}
                         className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#EA580C] transition-colors disabled:opacity-50"
                     >
@@ -182,6 +313,96 @@ export default function ItineraryPage({ params }: Props) {
                     </button>
                 )}
             </div>
+
+            {/* AI Generation Dialog */}
+            {showAIDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white w-full max-w-lg mx-4 shadow-xl">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-[#e5e5e5] flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-[#EA580C]" />
+                                <h2 className="font-display text-lg font-800 uppercase tracking-wide">AI Itinerary</h2>
+                            </div>
+                            <button onClick={() => setShowAIDialog(false)} className="text-[#0A0A0A]/40 hover:text-[#0A0A0A]">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Trip info */}
+                        <div className="px-6 py-4 bg-[#0A0A0A]/5 border-b border-[#e5e5e5]">
+                            <div className="flex items-center gap-4 text-sm">
+                                <span className="font-700">{trip.destination}</span>
+                                <span className="text-[#0A0A0A]/40">·</span>
+                                <span className="text-[#0A0A0A]/60">{days.length} days</span>
+                                <span className="text-[#0A0A0A]/40">·</span>
+                                <span className="text-[#0A0A0A]/60">{format(new Date(trip.startDate), "MMM d")} – {format(new Date(trip.endDate), "MMM d")}</span>
+                            </div>
+                        </div>
+
+                        {/* User preferences prompt */}
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/50 mb-2">
+                                    <MessageSquare className="w-3 h-3 inline mr-1" />
+                                    Tell us about your trip preferences
+                                </label>
+                                <textarea
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    placeholder="e.g., We love street food, prefer walking tours, interested in local culture and history. Budget-friendly options preferred. Want free time in afternoons..."
+                                    className="w-full border border-[#e5e5e5] px-4 py-3 text-sm focus:outline-none focus:border-[#0A0A0A] resize-none h-28"
+                                />
+                                <p className="text-xs text-[#0A0A0A]/30 mt-1">Optional — Leave empty for a general itinerary</p>
+                            </div>
+
+                            {/* Mode selection */}
+                            <div>
+                                <label className="block text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/50 mb-2">Generation Mode</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setAiMode("quick")}
+                                        className={`p-4 border-2 text-left transition-colors ${aiMode === "quick"
+                                            ? "border-[#EA580C] bg-[#EA580C]/5"
+                                            : "border-[#e5e5e5] hover:border-[#0A0A0A]"
+                                            }`}
+                                    >
+                                        <p className="font-display text-sm font-700 uppercase mb-1">Quick Plan</p>
+                                        <p className="text-xs text-[#0A0A0A]/50">Fast AI-generated plan with popular activities and sights</p>
+                                    </button>
+                                    <button
+                                        onClick={() => setAiMode("detailed")}
+                                        className={`p-4 border-2 text-left transition-colors ${aiMode === "detailed"
+                                            ? "border-[#EA580C] bg-[#EA580C]/5"
+                                            : "border-[#e5e5e5] hover:border-[#0A0A0A]"
+                                            }`}
+                                    >
+                                        <p className="font-display text-sm font-700 uppercase mb-1">Deep Research</p>
+                                        <p className="text-xs text-[#0A0A0A]/50">Comprehensive plan with local tips, timings, and costs</p>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-6 py-4 border-t border-[#e5e5e5] flex gap-3">
+                            <button
+                                onClick={handleAIGenerate}
+                                className="flex-1 bg-[#EA580C] text-white py-3 text-xs font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                Generate Itinerary
+                            </button>
+                            <button
+                                onClick={() => setShowAIDialog(false)}
+                                className="border border-[#e5e5e5] px-6 py-3 text-xs font-700 uppercase tracking-wider hover:border-[#0A0A0A] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Day tabs */}
             <div className="border-b border-[#e5e5e5] px-8 flex gap-0 overflow-x-auto">
