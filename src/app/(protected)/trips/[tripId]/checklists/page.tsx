@@ -37,6 +37,7 @@ export default function ChecklistsPage({ params }: Props) {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ type: "packing", context: { destination: trip.destination, days: 7 } }),
             });
+            if (!res.ok) throw new Error("AI request failed");
             const data = await res.json();
             if (data.items) {
                 const listId = await createChecklist({ tripId, title: `AI Packing List — ${trip.destination}`, type: "packing", order: checklists.length });

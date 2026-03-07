@@ -56,6 +56,7 @@ export default function NewTripPage() {
                     context: { title: form.title, destination: form.destination },
                 }),
             });
+            if (!res.ok) throw new Error("AI request failed");
             const data = await res.json();
             update("description", data.description ?? "");
             toast.success("AI description generated!");
@@ -69,6 +70,10 @@ export default function NewTripPage() {
     const handleSubmit = async () => {
         if (!form.title || !form.destination || !form.startDate || !form.endDate) {
             toast.error("Please fill in all required fields");
+            return;
+        }
+        if (new Date(form.startDate) > new Date(form.endDate)) {
+            toast.error("End date must be on or after start date");
             return;
         }
         setLoading(true);
@@ -272,6 +277,7 @@ export default function NewTripPage() {
                                         value={form.totalBudget}
                                         onChange={(e) => update("totalBudget", e.target.value)}
                                         placeholder="e.g. 5000"
+                                        min="0"
                                         className="w-full border border-[#e5e5e5] pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#0A0A0A] transition-colors"
                                     />
                                 </div>

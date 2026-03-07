@@ -74,12 +74,16 @@ export default function BudgetPage({ params }: Props) {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ type: "budget", context: { destination: trip.destination, days: 7, travelers: members.length, currency: trip.currency } }),
             });
+            if (!res.ok) throw new Error("AI request failed");
             const data = await res.json();
             if (data.breakdown) {
+                const validCategories: string[] = [...CATEGORIES];
                 for (const b of data.breakdown) {
+                    const normalized = b.category.toLowerCase().replace(/[^a-z]/g, "");
+                    const category = validCategories.includes(normalized) ? normalized as typeof CATEGORIES[number] : "other";
                     await createExpense({
                         tripId, title: b.category, amount: b.estimated, currency: trip.currency,
-                        category: b.category.toLowerCase().replace(/[^a-z]/g, "") as any || "other",
+                        category,
                         paidBy: user._id, splitWith: [], date: Date.now(), notes: b.notes,
                     });
                 }
@@ -155,8 +159,8 @@ export default function BudgetPage({ params }: Props) {
                             <input type="text" placeholder="Expense name *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                                 className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
                             <input type="number" placeholder={`Amount (${trip.currency}) *`} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                                className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
-                            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as any })}
+                                min="0" className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
+                            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as typeof CATEGORIES[number] })}
                                 className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A] bg-white capitalize">
                                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>

@@ -1,5 +1,5 @@
 "use client";
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -28,21 +28,22 @@ export default function SettingsPage({ params }: Props) {
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     const [deleteConfirmName, setDeleteConfirmName] = useState("");
 
-    if (!trip || role === undefined) return <PageLoader />;
+    useEffect(() => {
+        if (!form && trip) {
+            setForm({
+                title: trip.title,
+                description: trip.description ?? "",
+                destination: trip.destination,
+                startDate: trip.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "",
+                endDate: trip.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "",
+                currency: trip.currency,
+                totalBudget: trip.totalBudget?.toString() ?? "",
+                status: trip.status,
+            });
+        }
+    }, [form, trip]);
 
-    if (!form && trip) {
-        setForm({
-            title: trip.title,
-            description: trip.description ?? "",
-            destination: trip.destination,
-            startDate: trip.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "",
-            endDate: trip.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "",
-            currency: trip.currency,
-            totalBudget: trip.totalBudget?.toString() ?? "",
-            status: trip.status,
-        });
-        return <PageLoader />;
-    }
+    if (!trip || role === undefined || !form) return <PageLoader />;
 
     if (!isOwner) {
         return (
@@ -120,6 +121,7 @@ export default function SettingsPage({ params }: Props) {
                                         className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-[#0A0A0A]" />
                                 ) : (
                                     <input type={f.type} value={form?.[f.key] ?? ""} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                                        min={f.type === "number" ? "0" : undefined}
                                         className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" />
                                 )}
                             </div>

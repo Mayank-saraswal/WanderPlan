@@ -172,6 +172,9 @@ export const deleteTrip = mutation({
         const reservations = await ctx.db.query("reservations").withIndex("by_trip", (q) => q.eq("tripId", args.tripId)).collect();
         await Promise.all(reservations.map((r) => ctx.db.delete(r._id)));
 
+        const comments = await ctx.db.query("comments").withIndex("by_trip", (q) => q.eq("tripId", args.tripId)).collect();
+        await Promise.all(comments.map((c) => ctx.db.delete(c._id)));
+
         const invites = await ctx.db.query("invites").withIndex("by_trip", (q) => q.eq("tripId", args.tripId)).collect();
         await Promise.all(invites.map((i) => ctx.db.delete(i._id)));
 

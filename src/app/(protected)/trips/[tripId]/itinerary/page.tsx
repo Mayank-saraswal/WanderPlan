@@ -27,6 +27,7 @@ export default function ItineraryPage({ params }: Props) {
     const { canEdit } = useTripMember(tripId);
     const trip = useQuery(api.trips.getTrip, { tripId });
     const days = useQuery(api.days.getDays, { tripId });
+    const members = useQuery(api.tripMembers.getTripMembers, { tripId });
     const [activeDay, setActiveDay] = useState(0);
     const [showForm, setShowForm] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
@@ -131,9 +132,10 @@ export default function ItineraryPage({ params }: Props) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     type: "itinerary",
-                    context: { destination: trip.destination, days: dayCount, travelers: 2 },
+                    context: { destination: trip.destination, days: dayCount, travelers: members?.length || 2 },
                 }),
             });
+            if (!res.ok) throw new Error("AI request failed");
             const data = await res.json();
             if (data.days) {
                 for (const dayData of data.days) {
@@ -230,9 +232,9 @@ export default function ItineraryPage({ params }: Props) {
                                         <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
                                             className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" placeholder="Location" />
                                         <input type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })}
-                                            className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" placeholder="Cost" />
+                                            min="0" className="border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A]" placeholder="Cost" />
                                     </div>
-                                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as any })}
+                                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as typeof CATEGORIES[number] })}
                                         className="w-full border border-[#e5e5e5] px-3 py-2.5 text-sm focus:outline-none focus:border-[#0A0A0A] bg-white capitalize">
                                         {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                                     </select>

@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { PageLoader } from "@/components/shared/EmptyState";
-import { Calendar, Users, DollarSign, Activity, MapPin, Clock, Crown, Pencil, Eye } from "lucide-react";
+import { Calendar, Users, DollarSign, Activity, MapPin, Clock, Crown, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 const ROLE_STYLES = {

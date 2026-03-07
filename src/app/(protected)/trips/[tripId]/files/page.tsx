@@ -49,6 +49,7 @@ export default function FilesPage({ params }: Props) {
         try {
             const url = await generateUploadUrl();
             const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+            if (!res.ok) throw new Error("File upload failed");
             const { storageId } = await res.json();
 
             const cat = file.type.includes("image") ? "image"

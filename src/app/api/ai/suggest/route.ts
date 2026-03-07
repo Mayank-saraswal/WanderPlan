@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import OpenAI from "openai";
+import { openai } from "@/lib/openai";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,17 @@ export async function POST(req: Request) {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { type, context } = await req.json();
+    let body: { type?: string; context?: Record<string, unknown> };
+    try {
+        body = await req.json();
+    } catch {
+        return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { type, context } = body;
+    if (!type || !context) {
+        return Response.json({ error: "Missing type or context" }, { status: 400 });
+    }
 
     const prompts: Record<string, string> = {
         itinerary: `You are an expert travel planner. Generate a detailed ${context.days}-day itinerary for ${context.destination} for ${context.travelers || 2} travelers. Return a JSON object with key "days" — an array of objects, each with: dayNumber (number), date (string), title (string), activities (array of objects with: title, description, startTime (HH:MM), endTime (HH:MM), location, cost (number), currency, category (transport|accommodation|food|activity|other)). Be specific, realistic, and practical.`,
@@ -24,14 +34,19 @@ export async function POST(req: Request) {
     }
 
     try {
-        const res = await new OpenAI({ apiKey: process.env.OPENAI_API_KEY }).chat.completions.create({
+        const res = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [{ role: "user", content: prompts[type] }],
             response_format: { type: "json_object" },
             temperature: 0.8,
         });
 
-        return Response.json(JSON.parse(res.choices[0].message.content!));
+        const content = res.choices[0]?.message.content;
+        if (!content) {
+            return Response.json({ error: "No response from AI" }, { status: 500 });
+        }
+
+        return Response.json(JSON.parse(content));
     } catch (error) {
         console.error("OpenAI error:", error);
         return Response.json({ error: "AI suggestion failed" }, { status: 500 });
