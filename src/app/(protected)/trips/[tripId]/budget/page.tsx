@@ -67,6 +67,16 @@ export default function BudgetPage({ params }: Props) {
         } catch (e: any) { toast.error(e.message); }
     };
 
+    const mapToCategory = (raw: string): typeof CATEGORIES[number] => {
+        const s = raw.toLowerCase();
+        if (s.includes("transport") || s.includes("flight") || s.includes("taxi") || s.includes("train") || s.includes("bus") || s.includes("uber")) return "transport";
+        if (s.includes("hotel") || s.includes("accommodation") || s.includes("stay") || s.includes("hostel") || s.includes("airbnb") || s.includes("lodging")) return "accommodation";
+        if (s.includes("food") || s.includes("dining") || s.includes("meal") || s.includes("restaurant") || s.includes("eat") || s.includes("coffee") || s.includes("drink")) return "food";
+        if (s.includes("shop") || s.includes("souvenir") || s.includes("gift") || s.includes("market") || s.includes("buying")) return "shopping";
+        if (s.includes("activity") || s.includes("tour") || s.includes("entertainment") || s.includes("excursion") || s.includes("museum") || s.includes("sightseeing") || s.includes("ticket")) return "activity";
+        return "other";
+    };
+
     const handleAIBudget = async () => {
         setAiLoading(true);
         try {
@@ -79,7 +89,7 @@ export default function BudgetPage({ params }: Props) {
                 for (const b of data.breakdown) {
                     await createExpense({
                         tripId, title: b.category, amount: b.estimated, currency: trip.currency,
-                        category: b.category.toLowerCase().replace(/[^a-z]/g, "") as any || "other",
+                        category: mapToCategory(b.category),
                         paidBy: user._id, splitWith: [], date: Date.now(), notes: b.notes,
                     });
                 }

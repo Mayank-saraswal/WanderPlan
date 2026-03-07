@@ -1,11 +1,14 @@
 "use client";
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AppSidebar } from "@/components/layout/Sidebar";
 import { EmptyState, PageLoader } from "@/components/shared/EmptyState";
 import Link from "next/link";
-import { Plane, MapPin, Calendar, Users, Plus, Clock } from "lucide-react";
+import { Plane, MapPin, Calendar, Users, Plus, Clock, Mail, Check, X, Bell } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type TripWithRole = {
     _id: string;
@@ -73,12 +76,116 @@ function TripCard({ trip }: { trip: TripWithRole }) {
     );
 }
 
+function InviteCard({ invite, onAccept, onDecline }: {
+    invite: any;
+    onAccept: () => void;
+    onDecline: () => void;
+}) {
+    const [loading, setLoading] = useState<"accept" | "decline" | null>(null);
+
+    return (
+        <div className="border border-[#EA580C]/30 bg-[#EA580C]/5 p-5 flex items-center gap-4">
+            {/* Inviter avatar */}
+            <div className="flex-shrink-0">
+                {invite.inviter?.imageUrl ? (
+                    <img src={invite.inviter.imageUrl} alt={invite.inviter.name} className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                    <div className="w-10 h-10 bg-[#EA580C] flex items-center justify-center text-white text-sm font-700 rounded-full">
+                        <Mail className="w-5 h-5" />
+                    </div>
+                )}
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-600 text-[#0A0A0A]">
+                    <span className="font-700">{invite.inviter?.name ?? "Someone"}</span> invited you to join
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="font-display text-base font-800 uppercase text-[#0A0A0A]">{invite.trip.title}</span>
+                    <span className="text-[#EA580C] text-xs flex items-center gap-1">
+                        <MapPin className="w-3 h-3" strokeWidth={1.5} />
+                        {invite.trip.destination}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                    <span className={`text-xs font-700 uppercase tracking-wider px-2 py-0.5 ${invite.role === "editor" ? "bg-[#0A0A0A] text-white" : "border border-[#0A0A0A] text-[#0A0A0A]"}`}>
+                        {invite.role}
+                    </span>
+                    <span className="text-xs text-[#0A0A0A]/40">
+                        Expires {format(new Date(invite.expiresAt), "MMM d, yyyy")}
+                    </span>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                    onClick={async () => {
+                        setLoading("accept");
+                        try {
+                            await onAccept();
+                        } finally {
+                            setLoading(null);
+                        }
+                    }}
+                    disabled={loading !== null}
+                    className="inline-flex items-center gap-1.5 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-4 py-2.5 hover:bg-[#C2410C] transition-colors disabled:opacity-50"
+                >
+                    <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                    {loading === "accept" ? "Joining..." : "Accept"}
+                </button>
+                <button
+                    onClick={async () => {
+                        setLoading("decline");
+                        try {
+                            await onDecline();
+                        } finally {
+                            setLoading(null);
+                        }
+                    }}
+                    disabled={loading !== null}
+                    className="inline-flex items-center gap-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/60 text-xs font-700 uppercase tracking-wider px-4 py-2.5 hover:border-red-500 hover:text-red-500 transition-colors disabled:opacity-50"
+                >
+                    <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+                    Decline
+                </button>
+            </div>
+        </div>
+    );
+}
+
 export default function DashboardPage() {
     const trips = useQuery(api.trips.getMyTrips) as TripWithRole[] | undefined;
+    const pendingInvites = useQuery(api.tripMembers.getMyPendingInvites);
+    const acceptInvite = useMutation(api.tripMembers.acceptInvite);
+    const declineInvite = useMutation(api.tripMembers.declineInvite);
+    const router = useRouter();
+
+    const handleAccept = async (token: string) => {
+        try {
+            const tripId = await acceptInvite({ token });
+            toast.success("You've joined the trip!");
+            router.push(`/trips/${tripId}/overview`);
+        } catch (e: any) {
+            toast.error(e.message || "Failed to accept invite");
+        }
+    };
+
+    const handleDecline = async (inviteId: string) => {
+        try {
+            await declineInvite({ inviteId: inviteId as any });
+            toast.success("Invite declined");
+        } catch (e: any) {
+            toast.error(e.message || "Failed to decline invite");
+        }
+    };
+
+    const inviteCount = pendingInvites?.length ?? 0;
 
     return (
         <div className="flex min-h-screen bg-white">
-            <AppSidebar />
+            <AppSidebar inviteCount={inviteCount} />
             <main className="flex-1 ml-56">
                 {/* Top bar */}
                 <div className="border-b border-[#e5e5e5] px-8 py-6 flex items-center justify-between">
@@ -95,10 +202,39 @@ export default function DashboardPage() {
                     </Link>
                 </div>
 
+                {/* Pending invites section */}
+                {pendingInvites && pendingInvites.length > 0 && (
+                    <div className="px-8 py-6 border-b border-[#e5e5e5] bg-gradient-to-r from-[#EA580C]/5 to-transparent">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-[#EA580C] flex items-center justify-center">
+                                <Bell className="w-4 h-4 text-white" strokeWidth={2} />
+                            </div>
+                            <div>
+                                <h2 className="font-display text-lg font-800 uppercase tracking-wide text-[#0A0A0A]">
+                                    PENDING INVITATIONS
+                                </h2>
+                                <p className="text-xs text-[#0A0A0A]/40">
+                                    {pendingInvites.length} invitation{pendingInvites.length !== 1 ? "s" : ""} waiting for your response
+                                </p>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            {pendingInvites.map((invite: any) => (
+                                <InviteCard
+                                    key={invite._id}
+                                    invite={invite}
+                                    onAccept={() => handleAccept(invite.token)}
+                                    onDecline={() => handleDecline(invite._id)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="px-8 py-8">
                     {trips === undefined ? (
                         <PageLoader />
-                    ) : trips.length === 0 ? (
+                    ) : trips.length === 0 && inviteCount === 0 ? (
                         <EmptyState
                             icon={<Plane className="w-8 h-8" strokeWidth={1} />}
                             title="No Trips Yet"
@@ -113,6 +249,10 @@ export default function DashboardPage() {
                                 </Link>
                             }
                         />
+                    ) : trips.length === 0 ? (
+                        <div className="text-center py-12">
+                            <p className="text-[#0A0A0A]/40 text-sm">No trips yet. Accept an invitation above or create a new trip.</p>
+                        </div>
                     ) : (
                         <div>
                             {/* Stats */}

@@ -201,3 +201,54 @@ export const revokeInvite = mutation({
         await ctx.db.delete(args.inviteId);
     },
 });
+
+export const getMyPendingInvites = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return [];
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .first();
+        if (!user) return [];
+
+        const invites = await ctx.db
+            .query("invites")
+            .withIndex("by_email", (q) => q.eq("email", user.email))
+            .filter((q) => q.eq(q.field("used"), false))
+            .collect();
+
+        // Filter expired and enrich with trip + inviter info
+        const now = Date.now();
+        const results = [];
+        for (const inv of invites) {
+            if (inv.expiresAt < now) continue;
+            const trip = await ctx.db.get(inv.tripId);
+            const inviter = await ctx.db.get(inv.invitedBy);
+            if (trip) {
+                results.push({
+                    ...inv,
+                    trip: { title: trip.title, destination: trip.destination },
+                    inviter: inviter ? { name: inviter.name, imageUrl: inviter.imageUrl } : null,
+                });
+            }
+        }
+        return results;
+    },
+});
+
+export const declineInvite = mutation({
+    args: { inviteId: v.id("invites") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const invite = await ctx.db.get(args.inviteId);
+        if (!invite) throw new Error("Invite not found");
+
+        // Mark as used so it can't be accepted later
+        await ctx.db.patch(args.inviteId, { used: true });
+    },
+});

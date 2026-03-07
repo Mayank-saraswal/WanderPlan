@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
-    Plane, MapPin, LayoutDashboard, Plus,
+    Plane, MapPin, LayoutDashboard, Plus, Bell,
     Calendar, Users, DollarSign, CheckSquare,
     Paperclip, Bookmark, Settings, Lock, ChevronLeft
 } from "lucide-react";
@@ -13,7 +13,7 @@ const dashNav = [
     { href: "/dashboard", label: "My Trips", icon: LayoutDashboard },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ inviteCount = 0 }: { inviteCount?: number }) {
     const pathname = usePathname();
     return (
         <div className="fixed left-0 top-0 h-screen w-56 bg-[#0A0A0A] flex flex-col z-40 border-r border-white/10">
@@ -45,6 +45,31 @@ export function AppSidebar() {
                         </Link>
                     );
                 })}
+                {/* Invites link */}
+                <Link
+                    href="/dashboard"
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 text-sm font-600 uppercase tracking-wider transition-colors",
+                        inviteCount > 0
+                            ? "text-[#EA580C]"
+                            : "text-white/50 hover:text-white"
+                    )}
+                    onClick={(e) => {
+                        // Scroll to invites section
+                        if (pathname === "/dashboard") {
+                            e.preventDefault();
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                    }}
+                >
+                    <Bell className="w-4 h-4" strokeWidth={1.5} />
+                    Invites
+                    {inviteCount > 0 && (
+                        <span className="ml-auto bg-[#EA580C] text-white text-[10px] font-800 w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
+                            {inviteCount}
+                        </span>
+                    )}
+                </Link>
                 <Link
                     href="/trips/new"
                     className="flex items-center gap-3 px-3 py-2.5 text-sm font-600 uppercase tracking-wider text-white/50 hover:text-white transition-colors"

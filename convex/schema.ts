@@ -191,5 +191,6 @@ export default defineSchema({
         used: v.boolean(),
     })
         .index("by_token", ["token"])
-        .index("by_trip", ["tripId"]),
+        .index("by_trip", ["tripId"])
+        .index("by_email", ["email"]),
 });
