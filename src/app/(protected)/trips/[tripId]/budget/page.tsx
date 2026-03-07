@@ -7,7 +7,7 @@ import { PageLoader, EmptyState } from "@/components/shared/EmptyState";
 import { useTripMember } from "@/hooks/useTripMember";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { toast } from "sonner";
-import { Plus, DollarSign, Sparkles, Trash2, ArrowRight, Users, Receipt, Scale, Check } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Users, Receipt, Scale, Check, Wallet, User, ChevronDown, Sparkles } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const CAT_COLORS: Record<string, string> = {
@@ -19,28 +19,23 @@ const CATEGORIES = ["transport", "accommodation", "food", "activity", "shopping"
 
 type Props = { params: Promise<{ tripId: string }> };
 
-// ─── Balance Calculation Engine ───
+// ─── Balance Calculation Engine (100% real data — no estimates) ───
 function calculateBalances(expenses: any[], members: any[]) {
-    // Track net balance for each user: positive = owed money, negative = owes money
     const netBalances: Record<string, number> = {};
     members.forEach((m: any) => { netBalances[m.userId] = 0; });
 
     for (const expense of expenses) {
         const payer = expense.paidBy;
-        // If splitWith is empty, assume split equally with all members
         const splitMembers = expense.splitWith && expense.splitWith.length > 0
             ? expense.splitWith
             : members.map((m: any) => m.userId);
 
-        // Include the payer in the split if they aren't already
         const allSplitters = splitMembers.includes(payer) ? splitMembers : [payer, ...splitMembers];
         const perPerson = expense.amount / allSplitters.length;
 
-        // Payer paid the full amount, so they are owed (amount - their share)
         if (netBalances[payer] !== undefined) {
             netBalances[payer] += expense.amount - perPerson;
         }
-        // Each other person owes their share
         for (const uid of allSplitters) {
             if (uid !== payer && netBalances[uid] !== undefined) {
                 netBalances[uid] -= perPerson;
@@ -51,7 +46,6 @@ function calculateBalances(expenses: any[], members: any[]) {
     return netBalances;
 }
 
-// Simplify debts into minimal transfers
 function simplifyDebts(netBalances: Record<string, number>) {
     const creditors: { id: string; amount: number }[] = [];
     const debtors: { id: string; amount: number }[] = [];
@@ -61,7 +55,6 @@ function simplifyDebts(netBalances: Record<string, number>) {
         else if (balance < -0.01) debtors.push({ id, amount: -balance });
     }
 
-    // Sort descending
     creditors.sort((a, b) => b.amount - a.amount);
     debtors.sort((a, b) => b.amount - a.amount);
 
@@ -85,6 +78,34 @@ function simplifyDebts(netBalances: Record<string, number>) {
     return settlements;
 }
 
+// ─── Per-member spending breakdown ───
+function getMemberSpending(expenses: any[], members: any[]) {
+    const spending: Record<string, { paid: number; share: number; count: number }> = {};
+    members.forEach((m: any) => { spending[m.userId] = { paid: 0, share: 0, count: 0 }; });
+
+    for (const expense of expenses) {
+        const payer = expense.paidBy;
+        if (spending[payer]) {
+            spending[payer].paid += expense.amount;
+            spending[payer].count += 1;
+        }
+
+        const splitMembers = expense.splitWith && expense.splitWith.length > 0
+            ? expense.splitWith
+            : members.map((m: any) => m.userId);
+        const allSplitters = splitMembers.includes(payer) ? splitMembers : [payer, ...splitMembers];
+        const perPerson = expense.amount / allSplitters.length;
+
+        for (const uid of allSplitters) {
+            if (spending[uid]) {
+                spending[uid].share += perPerson;
+            }
+        }
+    }
+
+    return spending;
+}
+
 export default function BudgetPage({ params }: Props) {
     const { tripId: rawTripId } = use(params);
     const tripId = rawTripId as Id<"trips">;
@@ -98,16 +119,22 @@ export default function BudgetPage({ params }: Props) {
     const notifyMembers = useMutation(api.notifications.notifyTripMembers);
 
     const [showForm, setShowForm] = useState(false);
-    const [aiLoading, setAiLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<"expenses" | "balances">("expenses");
+    const [activeTab, setActiveTab] = useState<"expenses" | "balances" | "members">("expenses");
     const [form, setForm] = useState({ title: "", amount: "", category: "food" as typeof CATEGORIES[number], notes: "" });
-    const [splitWith, setSplitWith] = useState<string[]>([]); // user IDs to split with
+    const [splitWith, setSplitWith] = useState<string[]>([]);
     const [splitMode, setSplitMode] = useState<"all" | "custom">("all");
+    const [paidBy, setPaidBy] = useState<string>("");
+    const [showPayerDropdown, setShowPayerDropdown] = useState(false);
 
     if (!trip || !expenses || !members || !user) return <PageLoader />;
 
-    const totalBudget = trip.totalBudget ?? 0;
+    // Set default payer to current user if not set
+    if (!paidBy && user) {
+        setPaidBy(user._id);
+    }
+
     const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalBudget = trip.totalBudget ?? 0;
     const remaining = totalBudget - totalSpent;
     const pct = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
 
@@ -117,23 +144,16 @@ export default function BudgetPage({ params }: Props) {
         color: CAT_COLORS[cat],
     })).filter((c) => c.value > 0);
 
-    // Balance calculations
+    // Real balance calculations
     const netBalances = calculateBalances(expenses, members);
     const settlements = simplifyDebts(netBalances);
+    const memberSpending = getMemberSpending(expenses, members);
 
-    // Member lookup helper
+    // Member lookup
     const memberLookup: Record<string, any> = {};
     members.forEach((m: any) => { memberLookup[m.userId] = m; });
-
-    const getMemberName = (userId: string) => {
-        const m = memberLookup[userId];
-        return m?.user?.name || m?.name || "Unknown";
-    };
-
-    const getMemberImage = (userId: string) => {
-        const m = memberLookup[userId];
-        return m?.user?.imageUrl || null;
-    };
+    const getMemberName = (userId: string) => memberLookup[userId]?.user?.name || "Unknown";
+    const getMemberImage = (userId: string) => memberLookup[userId]?.user?.imageUrl || null;
 
     const toggleSplitMember = (userId: string) => {
         setSplitWith((prev) =>
@@ -151,12 +171,12 @@ export default function BudgetPage({ params }: Props) {
                 amount: parseFloat(form.amount),
                 currency: trip.currency,
                 category: form.category,
-                paidBy: user._id,
+                paidBy: paidBy as Id<"users">,
                 splitWith: split,
                 date: Date.now(),
                 notes: form.notes || undefined,
             });
-            await notifyMembers({ tripId, type: "budget_updated", message: `Added expense: ${form.title} (${trip.currency} ${form.amount})` });
+            await notifyMembers({ tripId, type: "expense_added", message: `💰 ${getMemberName(paidBy)} paid ${trip.currency} ${form.amount} for ${form.title}` });
             setForm({ title: "", amount: "", category: "food", notes: "" });
             setSplitWith([]);
             setSplitMode("all");
@@ -165,99 +185,81 @@ export default function BudgetPage({ params }: Props) {
         } catch (e: any) { toast.error(e.message); }
     };
 
-    const mapToCategory = (raw: string): typeof CATEGORIES[number] => {
-        const s = raw.toLowerCase();
-        if (s.includes("transport") || s.includes("flight") || s.includes("taxi") || s.includes("train") || s.includes("bus") || s.includes("uber")) return "transport";
-        if (s.includes("hotel") || s.includes("accommodation") || s.includes("stay") || s.includes("hostel") || s.includes("airbnb") || s.includes("lodging")) return "accommodation";
-        if (s.includes("food") || s.includes("dining") || s.includes("meal") || s.includes("restaurant") || s.includes("eat") || s.includes("coffee") || s.includes("drink")) return "food";
-        if (s.includes("shop") || s.includes("souvenir") || s.includes("gift") || s.includes("market") || s.includes("buying")) return "shopping";
-        if (s.includes("activity") || s.includes("tour") || s.includes("entertainment") || s.includes("excursion") || s.includes("museum") || s.includes("sightseeing") || s.includes("ticket")) return "activity";
-        return "other";
-    };
-
-    const handleAIBudget = async () => {
-        setAiLoading(true);
-        try {
-            const res = await fetch("/api/ai/suggest", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "budget", context: { destination: trip.destination, days: 7, travelers: members.length, currency: trip.currency } }),
-            });
-            const data = await res.json();
-            if (data.breakdown) {
-                for (const b of data.breakdown) {
-                    await createExpense({
-                        tripId, title: b.category, amount: b.estimated, currency: trip.currency,
-                        category: mapToCategory(b.category),
-                        paidBy: user._id, splitWith: [], date: Date.now(), notes: b.notes,
-                    });
-                }
-                await notifyMembers({ tripId, type: "budget_updated", message: `AI budget estimate generated for ${trip.destination}` });
-                toast.success("AI budget estimate added!");
-            }
-        } catch { toast.error("AI budget failed"); } finally { setAiLoading(false); }
-    };
-
     return (
         <div>
             <div className="border-b border-[#e5e5e5] px-8 py-5 flex items-center justify-between">
                 <h1 className="font-display text-3xl font-900 uppercase text-[#0A0A0A]">BUDGET</h1>
                 {canEdit && (
-                    <button onClick={handleAIBudget} disabled={aiLoading}
-                        className="inline-flex items-center gap-2 border border-[#0A0A0A] text-[#0A0A0A] text-xs font-700 uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A] hover:text-white transition-colors disabled:opacity-50">
-                        <Sparkles className="w-4 h-4" /> {aiLoading ? "Estimating..." : "AI Estimate"}
+                    <button onClick={() => setShowForm(!showForm)}
+                        className="inline-flex items-center gap-2 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-6 py-3 hover:bg-[#C2410C] transition-colors">
+                        <Plus className="w-5 h-5" /> Add Expense
                     </button>
                 )}
             </div>
 
-            {/* Stat cards */}
-            <div className="grid grid-cols-3 border-b border-[#e5e5e5]">
-                {[
-                    { label: "Total Budget", value: totalBudget > 0 ? `${trip.currency} ${totalBudget.toLocaleString()}` : "Not set", cls: "" },
-                    { label: "Spent", value: `${trip.currency} ${totalSpent.toLocaleString()}`, cls: "border-x border-[#e5e5e5]" },
-                    { label: "Remaining", value: `${trip.currency} ${remaining.toLocaleString()}`, cls: remaining < 0 ? "text-red-500" : "" },
-                ].map((s) => (
-                    <div key={s.label} className={`px-8 py-6 ${s.cls}`}>
-                        <p className={`font-display text-3xl font-900 text-[#0A0A0A] ${s.cls}`}>{s.value}</p>
-                        <p className="text-[#0A0A0A]/40 text-xs uppercase tracking-wider mt-1">{s.label}</p>
-                        {s.label === "Spent" && totalBudget > 0 && (
-                            <div className="mt-3 h-1.5 bg-[#e5e5e5] w-full">
-                                <div className="h-full bg-[#EA580C] transition-all" style={{ width: `${pct}%` }} />
-                            </div>
-                        )}
-                    </div>
-                ))}
+            {/* Stats */}
+            <div className="grid grid-cols-4 border-b border-[#e5e5e5]">
+                <div className="px-6 py-5">
+                    <p className="font-display text-2xl font-900 text-[#0A0A0A]">
+                        {trip.currency} {totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[#0A0A0A]/40 text-xs uppercase tracking-wider mt-1">Total Spent</p>
+                </div>
+                <div className="px-6 py-5 border-x border-[#e5e5e5]">
+                    <p className="font-display text-2xl font-900 text-[#0A0A0A]">{expenses.length}</p>
+                    <p className="text-[#0A0A0A]/40 text-xs uppercase tracking-wider mt-1">Expenses</p>
+                </div>
+                <div className="px-6 py-5 border-r border-[#e5e5e5]">
+                    <p className="font-display text-2xl font-900 text-[#0A0A0A]">{members.length}</p>
+                    <p className="text-[#0A0A0A]/40 text-xs uppercase tracking-wider mt-1">Members</p>
+                </div>
+                <div className="px-6 py-5">
+                    <p className={`font-display text-2xl font-900 ${remaining < 0 ? "text-red-500" : "text-[#0A0A0A]"}`}>
+                        {totalBudget > 0 ? `${trip.currency} ${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                    </p>
+                    <p className="text-[#0A0A0A]/40 text-xs uppercase tracking-wider mt-1">
+                        {totalBudget > 0 ? "Remaining" : "No Budget Set"}
+                    </p>
+                    {totalBudget > 0 && (
+                        <div className="mt-2 h-1.5 bg-[#e5e5e5] w-full">
+                            <div className={`h-full transition-all ${pct > 90 ? "bg-red-500" : "bg-[#EA580C]"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Tabs: Expenses | Balances */}
+            {/* Tabs */}
             <div className="border-b border-[#e5e5e5] px-8 flex gap-0">
                 {([
-                    { key: "expenses" as const, label: "Expenses", icon: Receipt },
-                    { key: "balances" as const, label: "Who Owes Who", icon: Scale },
+                    { key: "expenses" as const, label: "Expenses", icon: Receipt, badge: expenses.length },
+                    { key: "balances" as const, label: "Who Owes Who", icon: Scale, badge: settlements.length },
+                    { key: "members" as const, label: "Member Spending", icon: Wallet, badge: 0 },
                 ]).map((t) => (
                     <button
                         key={t.key}
                         onClick={() => setActiveTab(t.key)}
                         className={`px-5 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.key
-                                ? "border-[#EA580C] text-[#0A0A0A]"
-                                : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
+                            ? "border-[#EA580C] text-[#0A0A0A]"
+                            : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
                             }`}
                     >
                         <t.icon className="w-3.5 h-3.5" />
                         {t.label}
-                        {t.key === "balances" && settlements.length > 0 && (
+                        {t.badge > 0 && (
                             <span className="bg-[#EA580C] text-white text-[10px] font-800 w-5 h-5 flex items-center justify-center rounded-full">
-                                {settlements.length}
+                                {t.badge}
                             </span>
                         )}
                     </button>
                 ))}
             </div>
 
+            {/* ═══ EXPENSES TAB ═══ */}
             {activeTab === "expenses" && (
                 <div className="grid grid-cols-2 divide-x divide-[#e5e5e5]">
                     {/* Chart */}
                     <div className="px-8 py-6">
-                        <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">BY CATEGORY</p>
+                        <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">SPENDING BY CATEGORY</p>
                         {byCategory.length === 0 ? (
                             <p className="text-[#0A0A0A]/30 text-sm py-10 text-center">No expenses yet</p>
                         ) : (
@@ -266,28 +268,24 @@ export default function BudgetPage({ params }: Props) {
                                     <Pie data={byCategory} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" strokeWidth={0}>
                                         {byCategory.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                                     </Pie>
-                                    <Tooltip formatter={(v: any) => `${trip.currency} ${Number(v).toLocaleString()}`} />
+                                    <Tooltip formatter={(v: any) => `${trip.currency} ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
                                     <Legend iconType="square" iconSize={10} />
                                 </PieChart>
                             </ResponsiveContainer>
                         )}
                     </div>
 
-                    {/* Expense list + add form */}
+                    {/* Expense list + form */}
                     <div className="px-8 py-6">
                         <div className="flex items-center justify-between mb-4">
-                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A]">EXPENSES</p>
-                            {canEdit && (
-                                <button onClick={() => setShowForm(!showForm)}
-                                    className="inline-flex items-center gap-1 text-xs text-[#EA580C] font-700 uppercase tracking-wider">
-                                    <Plus className="w-3.5 h-3.5" /> Add
-                                </button>
-                            )}
+                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A]">ALL EXPENSES</p>
                         </div>
 
+                        {/* Add expense form */}
                         {showForm && canEdit && (
-                            <div className="space-y-2 mb-4 border border-[#e5e5e5] p-4">
-                                <input type="text" placeholder="Expense name *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                            <div className="space-y-2 mb-4 border border-[#EA580C] p-4 bg-[#EA580C]/5">
+                                <p className="text-xs font-700 uppercase tracking-wider text-[#EA580C] mb-2">New Expense</p>
+                                <input type="text" placeholder="What was it for? *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                                     className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
                                 <input type="number" placeholder={`Amount (${trip.currency}) *`} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
                                     className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
@@ -296,7 +294,46 @@ export default function BudgetPage({ params }: Props) {
                                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                                 </select>
 
-                                {/* Split with selector */}
+                                {/* WHO PAID — Payer selector */}
+                                <div className="border border-[#e5e5e5] p-3">
+                                    <p className="text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/60 mb-2 flex items-center gap-1">
+                                        <User className="w-3 h-3" /> Who paid?
+                                    </p>
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowPayerDropdown(!showPayerDropdown)}
+                                            className="w-full flex items-center gap-2 px-3 py-2 border border-[#e5e5e5] text-sm text-left hover:border-[#0A0A0A] transition-colors"
+                                        >
+                                            {getMemberImage(paidBy) && (
+                                                <img src={getMemberImage(paidBy)} className="w-5 h-5 rounded-full" alt="" />
+                                            )}
+                                            <span className="flex-1 font-600">{getMemberName(paidBy)}</span>
+                                            {paidBy === user._id && <span className="text-[10px] text-[#EA580C] font-700 uppercase">You</span>}
+                                            <ChevronDown className="w-3.5 h-3.5 text-[#0A0A0A]/30" />
+                                        </button>
+                                        {showPayerDropdown && (
+                                            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[#e5e5e5] shadow-lg z-10">
+                                                {members.map((m: any) => (
+                                                    <button
+                                                        key={m.userId}
+                                                        onClick={() => { setPaidBy(m.userId); setShowPayerDropdown(false); }}
+                                                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-[#0A0A0A]/5 transition-colors ${paidBy === m.userId ? "bg-[#EA580C]/10" : ""
+                                                            }`}
+                                                    >
+                                                        {m.user?.imageUrl && (
+                                                            <img src={m.user.imageUrl} className="w-5 h-5 rounded-full" alt="" />
+                                                        )}
+                                                        <span className="flex-1 font-600">{m.user?.name || "Unknown"}</span>
+                                                        {m.userId === user._id && <span className="text-[10px] text-[#EA580C] font-700 uppercase">You</span>}
+                                                        {paidBy === m.userId && <Check className="w-4 h-4 text-[#EA580C]" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Split with */}
                                 <div className="border border-[#e5e5e5] p-3">
                                     <p className="text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/60 mb-2 flex items-center gap-1">
                                         <Users className="w-3 h-3" /> Split with
@@ -307,7 +344,7 @@ export default function BudgetPage({ params }: Props) {
                                             className={`px-3 py-1.5 text-[10px] font-700 uppercase tracking-wider border transition-colors ${splitMode === "all" ? "bg-[#0A0A0A] text-white border-[#0A0A0A]" : "border-[#e5e5e5] text-[#0A0A0A]/50 hover:border-[#0A0A0A]"
                                                 }`}
                                         >
-                                            Everyone
+                                            Everyone ({members.length})
                                         </button>
                                         <button
                                             onClick={() => setSplitMode("custom")}
@@ -317,11 +354,16 @@ export default function BudgetPage({ params }: Props) {
                                             Custom
                                         </button>
                                     </div>
+                                    {splitMode === "all" && (
+                                        <p className="text-[10px] text-[#0A0A0A]/40">
+                                            {trip.currency} {form.amount ? (parseFloat(form.amount) / members.length).toFixed(2) : "0.00"} per person
+                                        </p>
+                                    )}
                                     {splitMode === "custom" && (
                                         <div className="space-y-1.5">
                                             {members.map((m: any) => {
-                                                if (m.userId === user._id) return null; // Don't show current user
                                                 const selected = splitWith.includes(m.userId);
+                                                const isPayerUser = m.userId === paidBy;
                                                 return (
                                                     <button
                                                         key={m.userId}
@@ -336,57 +378,86 @@ export default function BudgetPage({ params }: Props) {
                                                         {m.user?.imageUrl && (
                                                             <img src={m.user.imageUrl} className="w-5 h-5 rounded-full" alt="" />
                                                         )}
-                                                        <span className="font-600">{m.user?.name || "Unknown"}</span>
+                                                        <span className="font-600 flex-1">{m.user?.name || "Unknown"}</span>
+                                                        {isPayerUser && <span className="text-[10px] text-[#0A0A0A]/30">Payer</span>}
                                                     </button>
                                                 );
                                             })}
+                                            {splitWith.length > 0 && form.amount && (
+                                                <p className="text-[10px] text-[#0A0A0A]/40 mt-1">
+                                                    {trip.currency} {(parseFloat(form.amount) / (splitWith.includes(paidBy) ? splitWith.length : splitWith.length + 1)).toFixed(2)} per person
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
 
-                                <input type="text" placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                                <input type="text" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
                                     className="w-full border border-[#e5e5e5] px-3 py-2 text-sm focus:outline-none focus:border-[#0A0A0A]" />
-                                <button onClick={handleAdd} className="w-full bg-[#0A0A0A] text-white py-2 text-xs font-700 uppercase tracking-wider hover:bg-[#EA580C] transition-colors">
-                                    Add Expense
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={handleAdd} className="flex-1 bg-[#EA580C] text-white py-2.5 text-xs font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors flex items-center justify-center gap-1">
+                                        <Check className="w-4 h-4" /> Add Expense
+                                    </button>
+                                    <button onClick={() => setShowForm(false)}
+                                        className="border border-[#e5e5e5] px-4 py-2.5 text-xs hover:border-[#0A0A0A] transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                         )}
 
                         {expenses.length === 0 ? (
-                            <p className="text-[#0A0A0A]/30 text-sm text-center py-8">No expenses yet</p>
+                            <p className="text-[#0A0A0A]/30 text-sm text-center py-8">No expenses yet — add your first real expense above</p>
                         ) : (
-                            <div className="space-y-2 max-h-72 overflow-y-auto">
-                                {expenses.map((e: any) => (
-                                    <div key={e._id} className="flex items-center gap-3 group">
-                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[e.category] || "#ccc" }} />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-600 text-[#0A0A0A] truncate">{e.title}</p>
-                                            <p className="text-xs text-[#0A0A0A]/40 capitalize">
-                                                {e.category}
-                                                {e.paidByUser && <span className="ml-1">· Paid by {e.paidByUser.name}</span>}
-                                                {e.splitWith && e.splitWith.length > 0 && (
-                                                    <span className="ml-1">· Split {e.splitWith.length + 1} ways</span>
-                                                )}
-                                            </p>
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                {expenses.map((e: any) => {
+                                    const splitCount = e.splitWith && e.splitWith.length > 0 ? e.splitWith.length : members.length;
+                                    const perPerson = e.amount / (e.splitWith && e.splitWith.length > 0
+                                        ? (e.splitWith.includes(e.paidBy) ? e.splitWith.length : e.splitWith.length + 1)
+                                        : members.length);
+
+                                    return (
+                                        <div key={e._id} className="flex items-center gap-3 group border border-[#e5e5e5] px-3 py-2.5">
+                                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[e.category] || "#ccc" }} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-600 text-[#0A0A0A] truncate">{e.title}</p>
+                                                <div className="flex items-center gap-2 text-xs text-[#0A0A0A]/40">
+                                                    <span className="capitalize">{e.category}</span>
+                                                    <span>·</span>
+                                                    <span className="flex items-center gap-1">
+                                                        {e.paidByUser?.imageUrl && <img src={e.paidByUser.imageUrl} className="w-3.5 h-3.5 rounded-full" alt="" />}
+                                                        Paid by <strong className="font-600 text-[#0A0A0A]/60">{e.paidByUser?.name || "Unknown"}</strong>
+                                                    </span>
+                                                    <span>·</span>
+                                                    <span>{trip.currency} {perPerson.toFixed(2)}/person</span>
+                                                </div>
+                                            </div>
+                                            <p className="font-700 text-sm text-[#0A0A0A]">{trip.currency} {e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                            {canEdit && (
+                                                <button onClick={async () => { await deleteExpense({ expenseId: e._id }); await notifyMembers({ tripId, type: "expense_deleted", message: `🗑️ Deleted expense: ${e.title} (${trip.currency} ${e.amount})` }); toast.success("Deleted"); }}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-red-500">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
-                                        <p className="font-700 text-sm text-[#0A0A0A]">{trip.currency} {e.amount.toLocaleString()}</p>
-                                        {canEdit && (
-                                            <button onClick={() => { deleteExpense({ expenseId: e._id }); toast.success("Deleted"); }}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-red-500">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
                 </div>
             )}
 
+            {/* ═══ WHO OWES WHO TAB ═══ */}
             {activeTab === "balances" && (
                 <div className="px-8 py-6">
-                    {/* Settle Up Section */}
+                    <div className="bg-[#0A0A0A]/5 border border-[#e5e5e5] px-4 py-3 mb-6 flex items-center gap-2">
+                        <Scale className="w-4 h-4 text-[#0A0A0A]/40" />
+                        <p className="text-xs text-[#0A0A0A]/50">
+                            All balances are calculated from <strong className="text-[#0A0A0A] font-700">{expenses.length} real expenses</strong> totaling <strong className="text-[#0A0A0A] font-700">{trip.currency} {totalSpent.toFixed(2)}</strong>. No estimates.
+                        </p>
+                    </div>
+
                     {settlements.length === 0 ? (
                         <div className="text-center py-16">
                             <Scale className="w-12 h-12 text-[#0A0A0A]/10 mx-auto mb-3" strokeWidth={1} />
@@ -397,11 +468,12 @@ export default function BudgetPage({ params }: Props) {
                         </div>
                     ) : (
                         <div>
-                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">SETTLE UP — {settlements.length} payment{settlements.length > 1 ? "s" : ""} needed</p>
+                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">
+                                SETTLE UP — {settlements.length} payment{settlements.length > 1 ? "s" : ""} needed
+                            </p>
                             <div className="space-y-3 mb-8">
                                 {settlements.map((s, i) => (
                                     <div key={i} className="border border-[#e5e5e5] p-4 flex items-center gap-4">
-                                        {/* From */}
                                         <div className="flex items-center gap-2 flex-1 min-w-0">
                                             {getMemberImage(s.from) ? (
                                                 <img src={getMemberImage(s.from)} className="w-8 h-8 rounded-full" alt="" />
@@ -416,15 +488,13 @@ export default function BudgetPage({ params }: Props) {
                                             </div>
                                         </div>
 
-                                        {/* Amount */}
                                         <div className="flex flex-col items-center gap-1 px-3">
                                             <p className="font-display text-xl font-900 text-[#EA580C]">
-                                                {trip.currency} {s.amount.toLocaleString()}
+                                                {trip.currency} {s.amount.toFixed(2)}
                                             </p>
                                             <ArrowRight className="w-5 h-5 text-[#0A0A0A]/20" />
                                         </div>
 
-                                        {/* To */}
                                         <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
                                             <div className="text-right">
                                                 <p className="text-sm font-700 text-[#0A0A0A]">{getMemberName(s.to)}</p>
@@ -442,8 +512,7 @@ export default function BudgetPage({ params }: Props) {
                                 ))}
                             </div>
 
-                            {/* Per-person summary */}
-                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-3">INDIVIDUAL BALANCES</p>
+                            <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-3">NET BALANCES</p>
                             <div className="grid grid-cols-2 gap-2">
                                 {Object.entries(netBalances)
                                     .filter(([, b]) => Math.abs(b) > 0.01)
@@ -469,6 +538,77 @@ export default function BudgetPage({ params }: Props) {
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ═══ MEMBER SPENDING TAB ═══ */}
+            {activeTab === "members" && (
+                <div className="px-8 py-6">
+                    <div className="bg-[#0A0A0A]/5 border border-[#e5e5e5] px-4 py-3 mb-6 flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-[#0A0A0A]/40" />
+                        <p className="text-xs text-[#0A0A0A]/50">
+                            Shows exactly <strong className="text-[#0A0A0A] font-700">how much each member paid</strong> vs <strong className="text-[#0A0A0A] font-700">their fair share</strong> based on {expenses.length} real expenses.
+                        </p>
+                    </div>
+
+                    <p className="text-xs font-700 uppercase tracking-widest text-[#0A0A0A] mb-4">PER-MEMBER BREAKDOWN</p>
+
+                    <div className="space-y-3">
+                        {members.map((m: any) => {
+                            const stats = memberSpending[m.userId] || { paid: 0, share: 0, count: 0 };
+                            const diff = stats.paid - stats.share; // positive = overpaid, negative = underpaid
+
+                            return (
+                                <div key={m.userId} className="border border-[#e5e5e5] p-4">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        {m.user?.imageUrl ? (
+                                            <img src={m.user.imageUrl} className="w-10 h-10 rounded-full" alt="" />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-[#0A0A0A]/10 rounded-full flex items-center justify-center font-700 text-sm">
+                                                {(m.user?.name || "?").charAt(0)}
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                            <p className="font-700 text-[#0A0A0A]">{m.user?.name || "Unknown"}</p>
+                                            <p className="text-xs text-[#0A0A0A]/40">{stats.count} expense{stats.count !== 1 ? "s" : ""} paid</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className={`font-display text-lg font-900 ${diff > 0.01 ? "text-emerald-600" : diff < -0.01 ? "text-red-500" : "text-[#0A0A0A]/30"}`}>
+                                                {diff > 0.01 ? `+${trip.currency} ${diff.toFixed(2)}` : diff < -0.01 ? `-${trip.currency} ${Math.abs(diff).toFixed(2)}` : "Even"}
+                                            </p>
+                                            <p className="text-[10px] uppercase tracking-wider text-[#0A0A0A]/30">
+                                                {diff > 0.01 ? "Overpaid" : diff < -0.01 ? "Underpaid" : "Balanced"}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Bar visualizations */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="flex justify-between text-[10px] uppercase tracking-wider mb-1">
+                                                <span className="text-[#0A0A0A]/40">Actually Paid</span>
+                                                <span className="font-700 text-[#0A0A0A]">{trip.currency} {stats.paid.toFixed(2)}</span>
+                                            </div>
+                                            <div className="h-2 bg-[#e5e5e5]">
+                                                <div className="h-full bg-[#0A0A0A] transition-all"
+                                                    style={{ width: totalSpent > 0 ? `${(stats.paid / totalSpent) * 100}%` : "0%" }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-[10px] uppercase tracking-wider mb-1">
+                                                <span className="text-[#0A0A0A]/40">Fair Share</span>
+                                                <span className="font-700 text-[#0A0A0A]">{trip.currency} {stats.share.toFixed(2)}</span>
+                                            </div>
+                                            <div className="h-2 bg-[#e5e5e5]">
+                                                <div className="h-full bg-[#EA580C] transition-all"
+                                                    style={{ width: totalSpent > 0 ? `${(stats.share / totalSpent) * 100}%` : "0%" }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

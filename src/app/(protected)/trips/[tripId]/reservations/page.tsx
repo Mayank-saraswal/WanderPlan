@@ -76,7 +76,7 @@ export default function ReservationsPage({ params }: Props) {
                 <h1 className="font-display text-3xl font-900 uppercase text-[#0A0A0A]">RESERVATIONS</h1>
                 {canEdit && (
                     <button onClick={() => setShowForm(true)}
-                        className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#EA580C] transition-colors">
+                        className="inline-flex items-center gap-2 bg-[#EA580C] text-white text-xs font-700 uppercase tracking-wider px-5 py-3 hover:bg-[#C2410C] transition-colors">
                         <Plus className="w-4 h-4" /> Add Reservation
                     </button>
                 )}

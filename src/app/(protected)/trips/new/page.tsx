@@ -109,10 +109,10 @@ export default function NewTripPage() {
                         {steps.map((s, i) => (
                             <div key={s.num} className="flex items-center">
                                 <div className={`flex items-center justify-center w-8 h-8 text-sm font-700 border-2 transition-all ${step > s.num
-                                        ? "bg-[#0A0A0A] border-[#0A0A0A] text-white"
-                                        : step === s.num
-                                            ? "bg-[#EA580C] border-[#EA580C] text-white"
-                                            : "border-[#e5e5e5] text-[#0A0A0A]/30"
+                                    ? "bg-[#EA580C] border-[#EA580C] text-white"
+                                    : step === s.num
+                                        ? "bg-[#EA580C] border-[#EA580C] text-white"
+                                        : "border-[#e5e5e5] text-[#0A0A0A]/30"
                                     }`}>
                                     {step > s.num ? <Check className="w-4 h-4" /> : s.num}
                                 </div>
@@ -128,7 +128,7 @@ export default function NewTripPage() {
 
                     {/* Live preview */}
                     {(form.title || form.destination) && (
-                        <div className="border border-[#0A0A0A] p-5 mb-8 bg-[#0A0A0A] text-white">
+                        <div className="border border-[#EA580C] p-5 mb-8 bg-[#EA580C] text-white">
                             <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Preview</p>
                             <h2 className="font-display text-2xl font-900 uppercase">{form.title || "Trip Title"}</h2>
                             {form.destination && (
@@ -298,7 +298,7 @@ export default function NewTripPage() {
                                     step === 1 ? !form.title || !form.destination :
                                         step === 2 ? !form.startDate || !form.endDate : false
                                 }
-                                className="inline-flex items-center gap-2 bg-[#0A0A0A] text-white px-8 py-3 text-sm font-700 uppercase tracking-wider hover:bg-[#EA580C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 bg-[#EA580C] text-white px-8 py-3 text-sm font-700 uppercase tracking-wider hover:bg-[#C2410C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next <ArrowRight className="w-4 h-4" />
                             </button>

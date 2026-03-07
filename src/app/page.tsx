@@ -154,7 +154,7 @@ export default function LandingPage() {
                     </div>
                     <Link
                         href="/sign-up"
-                        className="inline-flex items-center gap-3 bg-[#0A0A0A] text-white font-700 uppercase tracking-widest px-10 py-5 hover:bg-white hover:text-[#0A0A0A] transition-colors text-sm whitespace-nowrap"
+                        className="inline-flex items-center gap-3 bg-[#EA580C] text-white font-700 uppercase tracking-widest px-10 py-5 hover:bg-[#C2410C] transition-colors text-sm whitespace-nowrap"
                     >
                         Start Free Today
                         <ArrowRight className="w-4 h-4" />

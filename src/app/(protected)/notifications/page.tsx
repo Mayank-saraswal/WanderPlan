@@ -6,7 +6,8 @@ import { PageLoader } from "@/components/shared/EmptyState";
 import Link from "next/link";
 import {
     Bell, Check, X, Mail, MapPin, CheckCheck,
-    Sparkles, DollarSign, FileText, UserPlus, Users, Calendar
+    Sparkles, DollarSign, FileText, UserPlus, Users, Calendar,
+    Lightbulb, ThumbsUp, Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -22,6 +23,11 @@ const NOTIF_ICONS: Record<string, any> = {
     file_uploaded: FileText,
     reservation_added: Calendar,
     checklist_updated: Check,
+    idea_proposed: Lightbulb,
+    idea_voted: ThumbsUp,
+    idea_status_changed: Lightbulb,
+    expense_added: DollarSign,
+    expense_deleted: Trash2,
 };
 
 const NOTIF_LABELS: Record<string, string> = {
@@ -33,6 +39,11 @@ const NOTIF_LABELS: Record<string, string> = {
     file_uploaded: "Files",
     reservation_added: "Reservations",
     checklist_updated: "Checklists",
+    idea_proposed: "Ideas",
+    idea_voted: "Ideas",
+    idea_status_changed: "Ideas",
+    expense_added: "Budget",
+    expense_deleted: "Budget",
 };
 
 export default function NotificationsPage() {
@@ -102,8 +113,8 @@ export default function NotificationsPage() {
                             key={t.key}
                             onClick={() => setTab(t.key)}
                             className={`px-5 py-3 text-xs font-700 uppercase tracking-wider border-b-2 transition-colors flex items-center gap-2 ${tab === t.key
-                                    ? "border-[#EA580C] text-[#0A0A0A]"
-                                    : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
+                                ? "border-[#EA580C] text-[#0A0A0A]"
+                                : "border-transparent text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
                                 }`}
                         >
                             {t.label}
@@ -153,7 +164,7 @@ export default function NotificationsPage() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-3 mt-1">
-                                                <span className={`text-xs font-700 uppercase tracking-wider px-2 py-0.5 ${invite.role === "editor" ? "bg-[#0A0A0A] text-white" : "border border-[#0A0A0A] text-[#0A0A0A]"}`}>
+                                                <span className={`text-xs font-700 uppercase tracking-wider px-2 py-0.5 ${invite.role === "editor" ? "bg-[#EA580C] text-white" : "border border-[#0A0A0A] text-[#0A0A0A]"}`}>
                                                     {invite.role}
                                                 </span>
                                                 <span className="text-xs text-[#0A0A0A]/40">
