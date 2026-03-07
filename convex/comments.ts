@@ -40,6 +40,8 @@ export const addComment = mutation({
 export const deleteComment = mutation({
     args: { commentId: v.id("comments") },
     handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
         await ctx.db.delete(args.commentId);
     },
 });

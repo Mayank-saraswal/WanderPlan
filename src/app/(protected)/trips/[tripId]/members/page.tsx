@@ -37,6 +37,10 @@ export default function MembersPage({ params }: Props) {
 
     const handleInvite = async () => {
         if (!email) return;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            toast.error("Please enter a valid email address");
+            return;
+        }
         setInviteLoading(true);
         try {
             await inviteMember({ tripId, email, role });
