@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WanderPlan - Offline</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0A0A0A;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .container { max-width: 400px; padding: 2rem; }
+        .icon { font-size: 3rem; margin-bottom: 1rem; }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        p {
+            color: rgba(255,255,255,0.4);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
+        }
+        .brand {
+            color: #EA580C;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-size: 0.75rem;
+        }
+        button {
+            background: #EA580C;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+        }
+        button:hover { background: #C2410C; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">✈️</div>
+        <h1>You're Offline</h1>
+        <p>It looks like you've lost your internet connection. Don't worry — your trip data will sync when you're back online.</p>
+        <button onclick="location.reload()">Try Again</button>
+        <br><br>
+        <span class="brand">WanderPlan</span>
+    </div>
+</body>
+</html>

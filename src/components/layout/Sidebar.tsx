@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import {
     Plane, MapPin, LayoutDashboard, Plus, Bell,
     Calendar, Users, DollarSign, CheckSquare,
-    Paperclip, Bookmark, Settings, Lock, ChevronLeft
+    Paperclip, Bookmark, Settings, Lock, ChevronLeft, Lightbulb, Map
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +96,8 @@ export function TripSidebar({ tripId, isOwner }: { tripId: string; isOwner?: boo
         { href: `${base}/itinerary`, label: "Itinerary", icon: Calendar },
         { href: `${base}/members`, label: "Members", icon: Users },
         { href: `${base}/budget`, label: "Budget", icon: DollarSign },
+        { href: `${base}/ideas`, label: "Ideas", icon: Lightbulb },
+        { href: `${base}/map`, label: "Map", icon: Map },
         { href: `${base}/checklists`, label: "Checklists", icon: CheckSquare },
         { href: `${base}/files`, label: "Files", icon: Paperclip },
         { href: `${base}/reservations`, label: "Reservations", icon: Bookmark },

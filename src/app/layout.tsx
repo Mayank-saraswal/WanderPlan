@@ -31,6 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#EA580C" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className={`antialiased ${dmSans.variable} ${barlowCondensed.variable} font-sans`} suppressHydrationWarning>
         <ClerkProvider>
@@ -39,6 +43,19 @@ export default function RootLayout({
             <Toaster richColors position="top-right" />
           </ConvexClientProvider>
         </ClerkProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.log('SW failed:', err));
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

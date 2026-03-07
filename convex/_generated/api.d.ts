@@ -14,6 +14,7 @@ import type * as comments from "../comments.js";
 import type * as days from "../days.js";
 import type * as expenses from "../expenses.js";
 import type * as files from "../files.js";
+import type * as ideas from "../ideas.js";
 import type * as notifications from "../notifications.js";
 import type * as reservations from "../reservations.js";
 import type * as tripMembers from "../tripMembers.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   days: typeof days;
   expenses: typeof expenses;
   files: typeof files;
+  ideas: typeof ideas;
   notifications: typeof notifications;
   reservations: typeof reservations;
   tripMembers: typeof tripMembers;

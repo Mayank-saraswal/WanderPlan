@@ -41,7 +41,7 @@ export const createActivity = mutation({
             v.literal("other")
         ),
         order: v.number(),
-        aiGenerated: v.boolean(),
+        aiGenerated: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
