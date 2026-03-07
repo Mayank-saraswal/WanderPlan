@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { AppSidebar } from "@/components/layout/Sidebar";
 import { EmptyState, PageLoader } from "@/components/shared/EmptyState";
 import Link from "next/link";
-import { Plane, MapPin, Calendar, Users, Plus, Clock, Mail, Check, X, Bell, CheckCheck, Sparkles, DollarSign, FileText, UserPlus } from "lucide-react";
+import { Plane, MapPin, Calendar, Users, Plus, Clock, Mail, Check, X, Bell } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -160,9 +160,6 @@ export default function DashboardPage() {
     const pendingInvites = useQuery(api.tripMembers.getMyPendingInvites);
     const acceptInvite = useMutation(api.tripMembers.acceptInvite);
     const declineInvite = useMutation(api.tripMembers.declineInvite);
-    const notifications = useQuery(api.notifications.getMyNotifications, { onlyUnread: false });
-    const markAllAsRead = useMutation(api.notifications.markAllAsRead);
-    const markAsRead = useMutation(api.notifications.markAsRead);
     const router = useRouter();
 
     const handleAccept = async (token: string) => {
@@ -185,18 +182,6 @@ export default function DashboardPage() {
     };
 
     const inviteCount = pendingInvites?.length ?? 0;
-    const unreadNotifs = notifications?.filter((n: any) => !n.read) ?? [];
-
-    const NOTIF_ICONS: Record<string, any> = {
-        itinerary_updated: Sparkles,
-        budget_updated: DollarSign,
-        member_joined: UserPlus,
-        member_removed: Users,
-        trip_updated: Calendar,
-        file_uploaded: FileText,
-        reservation_added: Calendar,
-        checklist_updated: Check,
-    };
 
     return (
         <div className="flex min-h-screen bg-white">
@@ -242,74 +227,6 @@ export default function DashboardPage() {
                                     onDecline={() => handleDecline(invite._id)}
                                 />
                             ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Notifications feed */}
-                {notifications && notifications.length > 0 && (
-                    <div className="px-8 py-6 border-b border-[#e5e5e5]">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#0A0A0A] flex items-center justify-center">
-                                    <Bell className="w-4 h-4 text-white" strokeWidth={2} />
-                                </div>
-                                <div>
-                                    <h2 className="font-display text-lg font-800 uppercase tracking-wide text-[#0A0A0A]">
-                                        NOTIFICATIONS
-                                    </h2>
-                                    <p className="text-xs text-[#0A0A0A]/40">
-                                        {unreadNotifs.length > 0 ? `${unreadNotifs.length} unread` : "All caught up"}
-                                    </p>
-                                </div>
-                            </div>
-                            {unreadNotifs.length > 0 && (
-                                <button
-                                    onClick={() => { markAllAsRead({}); toast.success("All marked as read"); }}
-                                    className="inline-flex items-center gap-1.5 text-xs font-700 uppercase tracking-wider text-[#0A0A0A]/40 hover:text-[#0A0A0A] transition-colors"
-                                >
-                                    <CheckCheck className="w-3.5 h-3.5" />
-                                    Mark all read
-                                </button>
-                            )}
-                        </div>
-                        <div className="space-y-1 max-h-64 overflow-y-auto">
-                            {notifications.slice(0, 15).map((n: any) => {
-                                const Icon = NOTIF_ICONS[n.type] || Bell;
-                                return (
-                                    <div
-                                        key={n._id}
-                                        className={`flex items-start gap-3 px-3 py-2.5 transition-colors cursor-pointer ${!n.read ? "bg-[#EA580C]/5 border-l-2 border-[#EA580C]" : "hover:bg-[#0A0A0A]/5"
-                                            }`}
-                                        onClick={() => {
-                                            if (!n.read) markAsRead({ notificationId: n._id });
-                                            if (n.tripId) router.push(`/trips/${n.tripId}/overview`);
-                                        }}
-                                    >
-                                        <div className={`w-7 h-7 flex items-center justify-center flex-shrink-0 mt-0.5 ${!n.read ? "bg-[#EA580C] text-white" : "bg-[#0A0A0A]/10 text-[#0A0A0A]/40"
-                                            }`}>
-                                            <Icon className="w-3.5 h-3.5" strokeWidth={2} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className={`text-xs ${!n.read ? "font-700 text-[#0A0A0A]" : "text-[#0A0A0A]/60"}`}>
-                                                <span className="font-700">{n.actor?.name ?? "Someone"}</span>{" "}
-                                                {n.message}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                {n.trip && (
-                                                    <span className="text-[10px] text-[#EA580C] font-600">{n.trip.title}</span>
-                                                )}
-                                                <span className="text-[10px] text-[#0A0A0A]/30">
-                                                    {format(new Date(n.createdAt), "MMM d, h:mm a")}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {!n.read && (
-                                            <div className="w-2 h-2 bg-[#EA580C] rounded-full flex-shrink-0 mt-2" />
-                                        )}
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
                 )}
