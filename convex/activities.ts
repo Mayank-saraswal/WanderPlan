@@ -22,6 +22,9 @@ export const getActivitiesByTrip = query({
     },
 });
 
+// Alias for getActivitiesByTrip since packing page expects getActivities
+export const getActivities = getActivitiesByTrip;
+
 export const createActivity = mutation({
     args: {
         tripId: v.id("trips"),

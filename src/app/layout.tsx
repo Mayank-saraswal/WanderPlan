@@ -14,6 +14,7 @@ const barlowCondensed = Barlow_Condensed({
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -39,8 +40,15 @@ export default function RootLayout({
       <body className={`antialiased ${dmSans.variable} ${barlowCondensed.variable} font-sans`} suppressHydrationWarning>
         <ClerkProvider>
           <ConvexClientProvider>
-            {children}
-            <Toaster richColors position="top-right" />
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+              <Toaster richColors position="top-right" />
+            </ThemeProvider>
           </ConvexClientProvider>
         </ClerkProvider>
         <script

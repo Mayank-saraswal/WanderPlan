@@ -113,7 +113,9 @@ export const notifyTripMembers = mutation({
             v.literal("idea_voted"),
             v.literal("idea_status_changed"),
             v.literal("expense_added"),
-            v.literal("expense_deleted")
+            v.literal("expense_deleted"),
+            v.literal("chat_message"),
+            v.literal("packing_reminder")
         ),
         message: v.string(),
     },

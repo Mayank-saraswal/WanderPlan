@@ -210,7 +210,9 @@ export default defineSchema({
             v.literal("idea_voted"),
             v.literal("idea_status_changed"),
             v.literal("expense_added"),
-            v.literal("expense_deleted")
+            v.literal("expense_deleted"),
+            v.literal("chat_message"),
+            v.literal("packing_reminder")
         ),
         message: v.string(),
         actorId: v.id("users"),
@@ -273,4 +275,47 @@ export default defineSchema({
         .index("by_trip", ["tripId"])
         .index("by_from_user", ["tripId", "fromUserId"])
         .index("by_to_user", ["tripId", "toUserId"]),
+
+    // ─── In-Trip Group Chat Messages ───
+    messages: defineTable({
+        tripId: v.id("trips"),
+        authorId: v.id("users"),
+        content: v.string(),
+        mentionDay: v.optional(v.number()),
+        mentionActivity: v.optional(v.string()),
+        createdAt: v.number(),
+    }).index("by_trip", ["tripId"]),
+
+    // ─── Boarding Pass Data ───
+    boardingPasses: defineTable({
+        tripId: v.id("trips"),
+        airline: v.string(),
+        flightNumber: v.string(),
+        departure: v.string(),
+        arrival: v.string(),
+        departureTime: v.optional(v.string()),
+        arrivalTime: v.optional(v.string()),
+        terminal: v.optional(v.string()),
+        gate: v.optional(v.string()),
+        seat: v.optional(v.string()),
+        date: v.string(),
+        passengerName: v.optional(v.string()),
+        rawText: v.optional(v.string()),
+        addedBy: v.id("users"),
+        createdAt: v.number(),
+    }).index("by_trip", ["tripId"]),
+
+    // ─── AI Packing Reminders ───
+    packingReminders: defineTable({
+        tripId: v.id("trips"),
+        weatherSummary: v.string(),
+        temperature: v.optional(v.string()),
+        items: v.array(v.object({
+            text: v.string(),
+            category: v.string(),
+            tip: v.optional(v.string()),
+        })),
+        generatedBy: v.id("users"),
+        generatedAt: v.number(),
+    }).index("by_trip", ["tripId"]),
 });
