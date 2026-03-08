@@ -132,7 +132,7 @@ export default function NewTripPage() {
                             <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Preview</p>
                             <h2 className="font-display text-2xl font-900 uppercase">{form.title || "Trip Title"}</h2>
                             {form.destination && (
-                                <p className="text-[#EA580C] text-sm font-600 uppercase tracking-wider mt-1">{form.destination}</p>
+                                <p className="font-display text-3xl font-900 uppercase text-[#0A0A0A]">{form.destination}</p>
                             )}
                             {form.startDate && form.endDate && (
                                 <p className="text-white/40 text-xs mt-2">
