@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WanderPlan
+
+WanderPlan is a collaborative trip planning application built with Next.js, Convex, Clerk, and OpenAI.
+
+## Tech Stack
+
+- **Framework**: [Next.js](https://nextjs.org/) (React 19)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/)
+- **Backend & Database**: [Convex](https://convex.dev/)
+- **Authentication**: [Clerk](https://clerk.com/)
+- **AI Integration**: [OpenAI API](https://openai.com/)
+
+## Prerequisites
+
+Make sure you have the following installed on your machine:
+- [Node.js](https://nodejs.org/) (v20 or newer recommended)
+- `npm`, `yarn`, `pnpm`, or `bun`
+
+You will also need accounts for the following services to get the necessary API keys:
+- A [Convex](https://convex.dev/) account
+- A [Clerk](https://clerk.com/) account
+- An [OpenAI](https://openai.com/) account
 
 ## Getting Started
 
-First, run the development server:
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd collabtrip
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Set up Environment Variables
+
+Create a `.env.local` file in the root directory based on the `.env.local.example` template:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Fill in the required environment variables in `.env.local`:
+
+```env
+# Convex
+# (This will be automatically populated when you run `npx convex dev`)
+NEXT_PUBLIC_CONVEX_URL=
+
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
+CLERK_JWT_ISSUER_DOMAIN=your_clerk_jwt_issuer_domain
+
+# Clerk redirect URLs
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+```
+
+### 4. Start the Convex Backend
+
+In a new terminal window, run the Convex development server. This will prompt you to log into Convex, create a new project, and automatically populate your `.env.local` file with the `NEXT_PUBLIC_CONVEX_URL`. It will also sync your Convex functions and schema.
+
+```bash
+npx convex dev
+```
+
+*Keep this terminal running in the background as you develop.*
+
+### 5. Start the Next.js Development Server
+
+In another terminal window, start the frontend Next.js development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to explore the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/src/app`: Next.js App Router pages, layouts, and API routes.
+- `/src/components`: React components including reusable UI components (shadcn/ui).
+- `/convex`: Convex backend functions (queries, mutations, actions) and database schema (`schema.ts`).
+- `/public`: Static assets (images, icons, etc.).
 
-## Learn More
+## Available Scripts
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev`: Starts the Next.js development server.
+- `npm run build`: Builds the application for production.
+- `npm run start`: Runs the built Next.js application.
+- `npm run lint`: Runs ESLint to identify code formatting and style issues.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com).
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push your code to a GitHub repository.
+2. Import the project into Vercel.
+3. Run `npx convex deploy` to deploy your Convex backend to production.
+4. Add your production environment variables to your Vercel project (including the production `NEXT_PUBLIC_CONVEX_URL`, Clerk keys, and OpenAI key).
+5. Deploy the application on Vercel.
