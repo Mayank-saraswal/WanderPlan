@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Bebas_Neue, DM_Mono } from "next/font/google";
 import "./globals.css";
-
+import { Analytics } from '@vercel/analytics/next';
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
@@ -46,6 +46,7 @@ export default function RootLayout({
         <ClerkProvider>
           <ConvexClientProvider>
             {children}
+            <Analytics/>
             <Toaster richColors position="top-right" />
           </ConvexClientProvider>
         </ClerkProvider>
